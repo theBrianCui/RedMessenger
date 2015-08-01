@@ -18,7 +18,9 @@ var IDENTIFIER_SUBJECT = 'identifier';
 var RM_CHANNEL_PREFIX = 'rm.';
 
 var Server = SocketIO.of(RM_ROUTE);
+
 var Clients = {};
+var MessageQueue = {};
 
 // SocketIO listen
 Http.listen(WS_PORT, onListenDebug);
@@ -55,11 +57,24 @@ function onConnect(socket) {
   console.log(socket.id + ": New connection! Waiting for ID");
 
   socket.on(IDENTIFIER_SUBJECT, function (message) {
-      onIdentityRecv(socket, message)
-  });
+    var channel = RM_CHANNEL_PREFIX + message;
+    onIdentityRecv(socket, message);
 
-  socket.emit(MESSAGE_SUBJECT, "You're subscribed to "
-    + RM_CHANNEL_PREFIX + socket.id + " on " + REDIS_HOST + "!");
+    socket.emit(MESSAGE_SUBJECT, "You're subscribed to "
+      + channel + " on " + REDIS_HOST + "!");
+
+    if (MessageQueue[channel] == null)
+      MessageQueue[channel] = [];
+    else
+      purgeMessageQueue(channel);
+  });
+}
+
+function purgeMessageQueue(channel) {
+  console.log(channel + " has " + MessageQueue[channel].length + " messages enqueued, purging!")
+  MessageQueue[channel].forEach(function(message) {
+    onQueuedMessage(channel, message);
+  });
 }
 
 function onIdentityRecv(socket, id) {
@@ -70,9 +85,22 @@ function onIdentityRecv(socket, id) {
 function onNewMessage(pattern, channel, message) {
   console.log("New message! Looking up socket " + channel);
   var socket = Clients[channel];
-  if (socket == null) {
+  if (socket == null || !socket.connected) {
     console.log("Client is not online, queueing message");
+    MessageQueue[channel].append(message);
   }
   console.log("Sending message " + message + " to " + socket.id);
   socket.emit(MESSAGE_SUBJECT, message);
+}
+
+function onQueuedMessage(channel, message) {
+  console.log(channel + " - Purging message " + message);
+  var socket = Clients[channel];
+  if (socket == null) {
+    console.log("Client is no longer online, not removing message from queue");
+    return;
+  }
+
+  socket.emit(MESSAGE_SUBJECT, message);
+  MessageQueue[channel].remove(message);
 }
