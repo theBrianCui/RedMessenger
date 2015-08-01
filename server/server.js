@@ -63,13 +63,18 @@ function onConnect(socket) {
     socket.emit(MESSAGE_SUBJECT, "You're subscribed to "
       + channel + " on " + REDIS_HOST + "!");
 
-    purgeMessageQueue(channel);
+    if (MessageQueue[channel] == null)
+      MessageQueue[channel] = [];
+    else
+      purgeMessageQueue(channel);
   });
 }
 
 function purgeMessageQueue(channel) {
-  console.log(channel + " has " + channel.length + " messages enqueued, purging!")
-  MessageQueue[channel].forEach(onQueuedMessage(channel, message), message);
+  console.log(channel + " has " + MessageQueue[channel].length + " messages enqueued, purging!")
+  MessageQueue[channel].forEach(function(message) {
+    onQueuedMessage(channel, message);
+  });
 }
 
 function onIdentityRecv(socket, id) {
@@ -92,7 +97,7 @@ function onQueuedMessage(channel, message) {
   console.log(channel + " - Purging message " + message);
   var socket = Clients[channel];
   if (socket == null) {
-    console.log("Client is no longer ontmuxline, not removing message from queue");
+    console.log("Client is no longer online, not removing message from queue");
     return;
   }
 
