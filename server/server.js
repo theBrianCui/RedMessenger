@@ -27,6 +27,7 @@ var redis = new Redis(
 
 // Express routes
 Express.get('/', onDefaultPageRequest);
+Express.get('/rm', onDefaultPageRequest);
 
 function onDefaultPageRequest(request, response) {
   console.log(request.ip + ": Sending default request response");
@@ -38,6 +39,7 @@ RedMessenger.on(SocketIOConnection, onConnect);
 
 function onConnect(socket) {
   console.log(socket.id + ": New connection!")
+  socket.emit('message', "Heya, " + socket.id + "!");
 }
 
 function onNewMessage(channel, message) {
