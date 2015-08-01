@@ -27,6 +27,7 @@ Client is not online, queueing message in Redis (rm:users:user1:messages)
 "RPUSH" "rm:users:user1:messages" "Hello, world!"
 "RPUSH" "rm:users:user1:messages" "My life is a spicy pepper..."
 ```
+
 This message will be stored in a message queue on Redis until a user is available to receieve it. This is done by passing a payload on a `WebSocket` open on RedMessenger containing the user's identifier, along with an optional authentication token.
 
 #### RedMessenger
@@ -102,3 +103,24 @@ user1: Purging message 'Meow!' from rm.cats
 "DEL" "rm:users:user1:messages"
 ```
 
+## Value namespaces
+
+### `rm:users:$uid:messages`
+Holds user `$uid`'s specific message queue.
+
+### `rm:users:$uid:key`
+Holds user `$uid`'s specific authentication token.
+
+### `rm:groups:$gid:members`
+Holds a list of members to deliver a message to `rm:groups:$gid` to.
+
+## Channel namespaces
+
+### `rm.users.$uid`
+`PUBLISH`ing to this channel will deliver a message to `$uid` directly.
+
+### `rm.groups.$gid`
+`PUBLISH`ing to this channel will deliver a message to all `$uid`s subscribed to `$gid`.
+
+## Example direct message flow
+* Send a message to **user1!**
