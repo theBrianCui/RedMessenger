@@ -85,7 +85,7 @@ function onIdentityRecv(socket, id) {
 function onNewMessage(pattern, channel, message) {
   console.log("New message! Looking up socket " + channel);
   var socket = Clients[channel];
-  if (socket == null) {
+  if (socket == null || !socket.connected) {
     console.log("Client is not online, queueing message");
     MessageQueue[channel].append(message);
   }
