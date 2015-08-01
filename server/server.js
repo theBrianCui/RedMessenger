@@ -92,9 +92,10 @@ function onQueuedMessage(channel, message) {
   console.log(channel + " - Purging message " + message);
   var socket = Clients[channel];
   if (socket == null) {
-    console.log("Client is no longer online, not removing message from queue");
+    console.log("Client is no longer ontmuxline, not removing message from queue");
     return;
   }
 
   socket.emit(MESSAGE_SUBJECT, message);
+  MessageQueue[channel].remove(message);
 }
