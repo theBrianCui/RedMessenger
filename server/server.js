@@ -75,13 +75,16 @@ function onConnect(socket) {
 function purgeMessageQueue(channel) {
   var messages = [];
   redisQueue.lrange(channel, 0, -1, function(error, result) {
+    console.log("DEBUG: redis server returned " + result);
     messages = result;
+
+    redisQueue.del(channel);
+    console.log(channel + " has " + messages.length + " messages enqueued, purging!");
+    messages.forEach(function(message) {
+      onQueuedMessage(channel, message);
+    });
   });
-  redisQueue.del(channel);
-  console.log(channel + " has " + messages.length + " messages enqueued, purging!");
-  messages.forEach(function(message) {
-    onQueuedMessage(channel, message);
-  });
+
 }
 
 function onIdentityRecv(socket, id) {
@@ -95,6 +98,10 @@ function onNewMessage(pattern, channel, message) {
   if (socket == null || !socket.connected) {
     console.log("Client is not online, queueing message IN REDIS");
     redisQueue.rpush(channel, message);
+    redisQueue.lrange(channel, 0, -1, function(error, result) {
+      console.log("DEBUG: redis server returned " + result);
+      console.log(JSON.stringify(result));
+    });
   }
 
   else {
@@ -112,5 +119,4 @@ function onQueuedMessage(channel, message) {
   }
 
   socket.emit(MESSAGE_SUBJECT, message);
-  MessageQueue[channel].remove(message);
 }
