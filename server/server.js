@@ -114,7 +114,8 @@ function onQueuedMessage(channel, message) {
   console.log(channel + " - Purging message " + message);
   var socket = Clients[channel];
   if (socket == null) {
-    console.log("Client is no longer online, not removing message from queue");
+    console.log("Client is no longer online, recommitting to queue");
+    redisQueue.rpush(channel, message);
     return;
   }
 
