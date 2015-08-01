@@ -30,13 +30,18 @@ function onListenDebug() {
 }
 
 // Connect to Redis instance
-var redis = new Redis(
+var redisSub = new Redis(
   host = REDIS_HOST,
   port = REDIS_PORT
 );
 
-redis.psubscribe(RM_CHANNEL_PREFIX + '*', onSubscribeDebug);
-redis.on(REDIS_NEW_MESSAGE, onNewMessage);
+var redisQueue = new Redis(
+  host = REDIS_HOST,
+  post = REDIS_PORT
+);
+
+redisSub.psubscribe(RM_CHANNEL_PREFIX + '*', onSubscribeDebug);
+redisSub.on(REDIS_NEW_MESSAGE, onNewMessage);
 
 function onSubscribeDebug(error, count) {
   console.log("We're now subscribed to " + count + " channels on Redis.");
@@ -63,16 +68,15 @@ function onConnect(socket) {
     socket.emit(MESSAGE_SUBJECT, "You're subscribed to "
       + channel + " on " + REDIS_HOST + "!");
 
-    if (MessageQueue[channel] == null)
-      MessageQueue[channel] = [];
-    else
-      purgeMessageQueue(channel);
+    purgeMessageQueue(channel);
   });
 }
 
 function purgeMessageQueue(channel) {
-  console.log(channel + " has " + MessageQueue[channel].length + " messages enqueued, purging!")
-  MessageQueue[channel].forEach(function(message) {
+  var messages = redisQueue.lrange(channel, 0, -1);
+  redisQueue.del(channel);
+  console.log(channel + " has " + messages.length + " messages enqueued, purging!");
+  messages.forEach(function(message) {
     onQueuedMessage(channel, message);
   });
 }
@@ -86,8 +90,8 @@ function onNewMessage(pattern, channel, message) {
   console.log("New message! Looking up socket " + channel);
   var socket = Clients[channel];
   if (socket == null || !socket.connected) {
-    console.log("Client is not online, queueing message");
-    MessageQueue[channel].append(message);
+    console.log("Client is not online, queueing message IN REDIS");
+    redisQueue.rpush(channel, message);
   }
   console.log("Sending message " + message + " to " + socket.id);
   socket.emit(MESSAGE_SUBJECT, message);
