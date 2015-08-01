@@ -7,7 +7,7 @@ var SocketIO = require('socket.io')(Http);
 var SocketIOConnection = 'connection';
 
 // TODO: Refactor into a config.json
-var REDIS_HOST = "localhost";
+var REDIS_HOST = "nm-hackathon";
 var WS_PORT = 8080;
 var REDIS_PORT = 6379;
 var SECURE_MODE = true;
@@ -85,7 +85,7 @@ function onIdentityRecv(socket, id) {
             function(err, result) {
                 console.log("Redis response: " + err + ", " + result);
                 if(!err && result === key) {
-                    socket.emit(MESSAGE_SUBJECT, "Identity verified! " + uid);
+                    console.log("Identity verified for " + uid);
                     assignClientSocket(socket, uid);
                 } else {
                     socket.on(IDENTIFIER_SUBJECT, null);
