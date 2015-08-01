@@ -10,7 +10,9 @@ var SocketIOConnection = 'connection';
 var HOST = "nm-hackathon";
 var WS_PORT = 8080;
 var REDIS_PORT = 6379;
-var RedMessenger = SocketIO.of('/rm');
+var ROOT = '/';
+var RM_ROUTE = '/rm';
+var RedMessenger = SocketIO.of(RM_ROUTE);
 
 // SocketIO listen
 Http.listen(WS_PORT, onListenDebug);
@@ -26,8 +28,8 @@ var redis = new Redis(
 );
 
 // Express routes
-Express.get('/', onDefaultPageRequest);
-Express.get('/rm', onDefaultPageRequest);
+Express.get(ROOT, onDefaultPageRequest);
+Express.get(RM_ROUTE, onDefaultPageRequest);
 
 function onDefaultPageRequest(request, response) {
   console.log(request.ip + ": Sending default request response");
@@ -38,7 +40,7 @@ function onDefaultPageRequest(request, response) {
 RedMessenger.on(SocketIOConnection, onConnect);
 
 function onConnect(socket) {
-  console.log(socket.id + ": New connection!")
+  console.log(socket.id + ": New connection!");
   socket.emit('message', "Heya, " + socket.id + "!");
 }
 
