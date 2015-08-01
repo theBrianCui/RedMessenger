@@ -11,14 +11,13 @@ var REDIS_HOST = "nm-hackathon";
 var WS_PORT = 8080;
 var REDIS_PORT = 6379;
 
-var ROOT = '/';
 var RM_ROUTE = '/rm';
 var REDIS_NEW_MESSAGE = 'pmessage';
 var MESSAGE_SUBJECT = 'message';
 var IDENTIFIER_SUBJECT = 'identifier';
 var RM_CHANNEL_PREFIX = 'rm.';
 
-var RedMessenger = SocketIO.of(RM_ROUTE);
+var Server = SocketIO.of(RM_ROUTE);
 var Clients = {};
 
 // SocketIO listen
@@ -42,7 +41,6 @@ function onSubscribeDebug(error, count) {
 }
 
 // Express routes
-Express.get(ROOT, onDefaultPageRequest);
 Express.get(RM_ROUTE, onDefaultPageRequest);
 
 function onDefaultPageRequest(request, response) {
@@ -51,7 +49,7 @@ function onDefaultPageRequest(request, response) {
 }
 
 // SocketIO connection events
-RedMessenger.on(SocketIOConnection, onConnect);
+Server.on(SocketIOConnection, onConnect);
 
 function onConnect(socket) {
   console.log(socket.id + ": New connection! Waiting for ID");
@@ -69,17 +67,7 @@ function onIdentityRecv(socket, id) {
   Clients[RM_CHANNEL_PREFIX + id] = socket;
 }
 
-function sendMessageToClient(channel, message) {
-  console.log(channel + ": " + message);
-  console.log("Sending to client " + socket.id);
-  socket.emit(MESSAGE_SUBJECT, message);
-}
-
 function onNewMessage(pattern, channel, message) {
-  //console.log(JSON.stringify(socket));
-  for(var i in Clients)
-    console.log(i)
-
   console.log("New message! Looking up socket " + channel);
   var socket = Clients[channel];
   if (socket == null) {
@@ -88,4 +76,3 @@ function onNewMessage(pattern, channel, message) {
   console.log("Sending message " + message + " to " + socket.id);
   socket.emit(MESSAGE_SUBJECT, message);
 }
-
