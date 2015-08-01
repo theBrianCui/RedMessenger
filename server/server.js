@@ -96,8 +96,11 @@ function onNewMessage(pattern, channel, message) {
     console.log("Client is not online, queueing message IN REDIS");
     redisQueue.rpush(channel, message);
   }
-  console.log("Sending message " + message + " to " + socket.id);
-  socket.emit(MESSAGE_SUBJECT, message);
+
+  else {
+    console.log("Sending message " + message + " to " + socket.id);
+    socket.emit(MESSAGE_SUBJECT, message);
+  }
 }
 
 function onQueuedMessage(channel, message) {
