@@ -1,0 +1,27 @@
+{
+    "name": "RedMessengerServer",
+    "description": "The Server part of this app",
+    "author": "The Red Heralds",
+    "contributors": [{
+	"name": "Kevin Avila",
+	"email": "kevin.avila@utexas.edu"
+    },{
+	"name": "Sean Collins",
+	"email": "seanc@seancotech.com"
+    },{
+	"name": "Brain Cui",
+	"email": "brianzcui@gmail.com"
+    },{
+	"name": "Sammy Israwi",
+	"email": "sammy.israwi@gmail.com"
+    }],
+    "repository": {
+    	"type": "git",
+	"url": "https://github.com/analytalica/RedMessenger"
+    },
+    "dependencies": {
+	"ioredis": ">= 1.7.2",
+	"socket.io": ">= 1.3.6"
+    },
+    "engine": "node 0.12.5"
+}
