@@ -1,17 +1,24 @@
-//RedMessenger Client goes here
-var rm = {
-    url: 'http://seanc-linux:8080/rm'
-};
+//RedMessenger Client Configuration
 
-if(io) {
-    rm.socket = io(rm.url);
+function RedMessenger(url, userID) {
+    this.url = url;
+    this.userID = userID;
 
-    rm.socket.on('connect', function() {
+    var socket = io(this.url);
+    socket.on('connect', function() {
         console.log('RedMessenger Connected!');
-        rm.socket.on('message', function(msg) {
-            console.log('Red Message! ' + msg);
-        });
-    });
-} else {
-    console.log('Socket.IO is not embedded on the page. RedMessenger notifications will not be enabled.');
+        console.log('Sending identifier ' + userID);
+
+        socket.emit('identifier', this.userID);
+
+        socket.on('message', function(msg) {
+            this.onMessage(msg);
+        }.bind(this))
+    }.bind(this));
+
+    this.onMessage =  function(msg) {
+        console.log('RedMessage! ' + msg);
+    };
 }
+
+var rm = new RedMessenger('http://seanc-linux:8080/rm', 'brianc');
