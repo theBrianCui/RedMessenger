@@ -1,5 +1,5 @@
 var Redis = require('ioredis');
-var Express = require('express');
+var Express = require('express')();
 var Http = require('http').Server(Express);
 var SocketIO = require('socket.io')(Http);
 
@@ -8,11 +8,16 @@ var SocketIOConnection = 'connection';
 
 // TODO: Refactor into a config.json
 var HOST = "nm-hackathon";
-var WS_PORT = 80;
+var WS_PORT = 8080;
 var REDIS_PORT = 6379;
+var RedMessenger = SocketIO.of('/rm');
 
 // SocketIO listen
-SocketIO.listen(WS_PORT);
+Http.listen(WS_PORT, onListenDebug);
+
+function onListenDebug() {
+  console.log("Now listening on port " + WS_PORT);
+}
 
 // Connect to Redis instance
 var redis = new Redis(
@@ -29,7 +34,7 @@ function onDefaultPageRequest(request, response) {
 }
 
 // SocketIO connection events
-SocketIO.on(SocketIOConnection, onConnect);
+RedMessenger.on(SocketIOConnection, onConnect);
 
 function onConnect(socket) {
   console.log(socket.id + ": New connection!")
