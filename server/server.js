@@ -93,13 +93,13 @@ function onIdentityRecv(socket, id, callback) {
                     assignClientSocket(socket, uid);
                     callback(uid);
                 } else {
-                    socket.on(IDENTIFIER_SUBJECT, function() {});
+                    socket.on('identifier', function() {});
                 }
             })
 
     } else {
         console.log("User key was not provided for " + uid);
-        socket.on(IDENTIFIER_SUBJECT, function() {});
+        socket.on('identifier', function() {});
     }
 }
 
