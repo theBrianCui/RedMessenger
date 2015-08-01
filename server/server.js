@@ -7,12 +7,17 @@ var SocketIO = require('socket.io')(Http);
 var SocketIOConnection = 'connection';
 
 // TODO: Refactor into a config.json
-var HOST = "nm-hackathon";
+var REDIS_HOST = "nm-hackathon";
 var WS_PORT = 8080;
 var REDIS_PORT = 6379;
+
 var ROOT = '/';
 var RM_ROUTE = '/rm';
+var MESSAGE_PREFIX = 'pmessage';
+var RM_CHANNEL_PREFIX = 'rm.';
+
 var RedMessenger = SocketIO.of(RM_ROUTE);
+var Clients = {};
 
 // SocketIO listen
 Http.listen(WS_PORT, onListenDebug);
@@ -23,9 +28,16 @@ function onListenDebug() {
 
 // Connect to Redis instance
 var redis = new Redis(
-  host = HOST,
+  host = REDIS_HOST,
   port = REDIS_PORT
 );
+
+redis.psubscribe(RM_CHANNEL_PREFIX + '*', onSubscribeDebug);
+redis.on(MESSAGE_PREFIX, onNewMessage);
+
+function onSubscribeDebug(error, count) {
+  console.log("We're now subscribed to " + count + " channels on Redis.");
+}
 
 // Express routes
 Express.get(ROOT, onDefaultPageRequest);
@@ -40,11 +52,24 @@ function onDefaultPageRequest(request, response) {
 RedMessenger.on(SocketIOConnection, onConnect);
 
 function onConnect(socket) {
-  console.log(socket.id + ": New connection!");
-  socket.emit('message', "Heya, " + socket.id + "!");
+  console.log(socket.id + ": New connection! Adding to table");
+  Clients[socket.id] = socket;
+
+  socket.emit(MESSAGE_PREFIX, "You're subscribed to "
+    + RM_CHANNEL_PREFIX + socket.id + " on " + REDIS_HOST + "!");
 }
 
-function onNewMessage(channel, message) {
+function sendMessageToClient(channel, message) {
   console.log(channel + ": " + message);
+  console.log("Sending to client " + socket.id);
+  socket.emit(MESSAGE_PREFIX, message);
+}
+
+function onNewMessage(pattern, channel, message) {
+  console.log(JSON.stringify(socket));
+  console.log("New message! Looking up socket " + channel);
+  var socket = Clients[channel];
+  console.log("Sending message to " + socket.id);
+  socket.emit(MESSAGE_PREFIX, message);
 }
 
