@@ -13,7 +13,9 @@ var REDIS_PORT = 6379;
 
 var ROOT = '/';
 var RM_ROUTE = '/rm';
-var MESSAGE_PREFIX = 'pmessage';
+var REDIS_NEW_MESSAGE = 'pmessage';
+var MESSAGE_SUBJECT = 'message';
+var IDENTIFIER_SUBJECT = 'identifier';
 var RM_CHANNEL_PREFIX = 'rm.';
 
 var RedMessenger = SocketIO.of(RM_ROUTE);
@@ -33,7 +35,7 @@ var redis = new Redis(
 );
 
 redis.psubscribe(RM_CHANNEL_PREFIX + '*', onSubscribeDebug);
-redis.on(MESSAGE_PREFIX, onNewMessage);
+redis.on(REDIS_NEW_MESSAGE, onNewMessage);
 
 function onSubscribeDebug(error, count) {
   console.log("We're now subscribed to " + count + " channels on Redis.");
@@ -52,24 +54,38 @@ function onDefaultPageRequest(request, response) {
 RedMessenger.on(SocketIOConnection, onConnect);
 
 function onConnect(socket) {
-  console.log(socket.id + ": New connection! Adding to table");
-  Clients[socket.id] = socket;
+  console.log(socket.id + ": New connection! Waiting for ID");
 
-  socket.emit(MESSAGE_PREFIX, "You're subscribed to "
+  socket.on(IDENTIFIER_SUBJECT, function (message) {
+      onIdentityRecv(socket, message)
+  });
+
+  socket.emit(MESSAGE_SUBJECT, "You're subscribed to "
     + RM_CHANNEL_PREFIX + socket.id + " on " + REDIS_HOST + "!");
+}
+
+function onIdentityRecv(socket, id) {
+  console.log("Assigning id " + id + " to socket " + socket.id);
+  Clients[RM_CHANNEL_PREFIX + id] = socket;
 }
 
 function sendMessageToClient(channel, message) {
   console.log(channel + ": " + message);
   console.log("Sending to client " + socket.id);
-  socket.emit(MESSAGE_PREFIX, message);
+  socket.emit(MESSAGE_SUBJECT, message);
 }
 
 function onNewMessage(pattern, channel, message) {
-  console.log(JSON.stringify(socket));
+  //console.log(JSON.stringify(socket));
+  for(var i in Clients)
+    console.log(i)
+
   console.log("New message! Looking up socket " + channel);
   var socket = Clients[channel];
-  console.log("Sending message to " + socket.id);
-  socket.emit(MESSAGE_PREFIX, message);
+  if (socket == null) {
+    console.log("Client is not online, queueing message");
+  }
+  console.log("Sending message " + message + " to " + socket.id);
+  socket.emit(MESSAGE_SUBJECT, message);
 }
 
