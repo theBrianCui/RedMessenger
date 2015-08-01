@@ -11,28 +11,25 @@ var REDIS_HOST = "nm-hackathon";
 var WS_PORT = 8080;
 var REDIS_PORT = 6379;
 var SECURE_MODE = true;
-
 var RM_ROUTE = '/rm';
-var REDIS_NEW_MESSAGE = 'pmessage'; //Note: hardcoded, can't be edited
 
 //Name and Namespace constants
+//Redis Key Naming
 var REDIS_KEY_PREFIX = 'rm:';
 var REDIS_USERS_PREFIX = 'users:';
-var REDIS_MESSAGES = ':messages';
 
-var MESSAGE_SUBJECT = 'message';
-var IDENTIFIER_SUBJECT = 'identifier';
+//Redis PubSub Channel Naming
 var RM_CHANNEL_PREFIX = 'rm.';
+var RM_USERS_PREFIX = 'users.';
 
 var Server = SocketIO.of(RM_ROUTE);
-
 var Clients = {};
 
 // SocketIO listen
 Http.listen(WS_PORT, onListenDebug);
 
 function onListenDebug() {
-  console.log("Now listening on port " + WS_PORT);
+    console.log("Now listening on port " + WS_PORT);
 }
 
 // Connect to Redis instance
@@ -46,58 +43,48 @@ var redisClient = new Redis({
     port: REDIS_PORT
 });
 
-redisSubscriber.psubscribe(RM_CHANNEL_PREFIX + '*', onSubscribeDebug);
-redisSubscriber.on(REDIS_NEW_MESSAGE, onNewMessage);
-
-function onSubscribeDebug(error, count) {
-  console.log("We're now subscribed to " + count + " channels on Redis.");
-}
+redisSubscriber.psubscribe(RM_CHANNEL_PREFIX + '*', function (error, count) {
+    console.log("We're now subscribed to " + count + " channels on Redis.");
+});
+redisSubscriber.on('pmessage', function(pattern, channel, message) {
+    onNewServerMessage(channel, message)
+});
 
 // Express routes
 Express.get(RM_ROUTE, onDefaultPageRequest);
 
 function onDefaultPageRequest(request, response) {
-  console.log(request.ip + ": Sending default request response");
-  response.send("Hey, you're connected!");
+    console.log(request.ip + ": Sending default request response");
+    response.send("Hey, you're connected!");
 }
 
 // SocketIO connection events
 Server.on(SocketIOConnection, onConnect);
 
 function onConnect(socket) {
-  console.log(socket.id + ": New connection! Waiting for ID");
+    console.log(socket.id + ": New connection! Waiting for ID");
 
-  socket.on(IDENTIFIER_SUBJECT, function (message) {
-    onIdentityRecv(socket, message, function(uid) {
-      purgeMessageQueue(uid, getQueueName(getChannelName(uid)));
+    socket.on('identifier', function (message) {
+        onIdentityRecv(socket, message, function(uid) {
+            purgeMessageQueue(uid);
+        });
     });
-  });
-}
-
-function purgeMessageQueue(uid, channel) {
-  var messages = [];
-  redisClient.lrange(channel, 0, -1, function(error, result) {
-    console.log("DEBUG: redis server returned " + result);
-    messages = result;
-
-    redisClient.del(channel);
-    console.log(channel + " has " + messages.length + " messages enqueued, purging!");
-    messages.forEach(function(message) {
-      onQueuedMessage(uid, channel, message);
-    });
-  });
-
 }
 
 function onIdentityRecv(socket, id, callback) {
     var idKey = id.split(':');
     var uid = idKey[0];
     var key = idKey[1];
+
     if(!SECURE_MODE) {
         assignClientSocket(socket, uid);
         callback(uid);
+
     } else if(key) {
+
         console.log("Verifying user key...");
+        console.log("Performing GET " + REDIS_KEY_PREFIX + REDIS_USERS_PREFIX + uid + ':key');
+
         redisClient.get(REDIS_KEY_PREFIX + REDIS_USERS_PREFIX + uid + ':key',
             function(err, result) {
                 console.log("Redis response: " + err + ", " + result);
@@ -106,58 +93,82 @@ function onIdentityRecv(socket, id, callback) {
                     assignClientSocket(socket, uid);
                     callback(uid);
                 } else {
-                    socket.on(IDENTIFIER_SUBJECT, function() {});
+                    socket.on('identifier', function() {});
                 }
             })
+
     } else {
         console.log("User key was not provided for " + uid);
-        socket.on(IDENTIFIER_SUBJECT, function() {});
+        socket.on('identifier', function() {});
     }
 }
 
-function assignClientSocket(socket, id) {
-    console.log("Assigning id " + id + " to socket " + socket.id);
-    Clients[id] = socket;
-
-    socket.emit(MESSAGE_SUBJECT, "You're subscribed to "
-      + (RM_CHANNEL_PREFIX + id) + " on " + REDIS_HOST + "!");
+function assignClientSocket(socket, uid) {
+    console.log("Assigning id " + uid + " to socket " + socket.id);
+    Clients[uid] = socket;
 }
 
-function onNewMessage(pattern, channel, message) {
-  console.log("New message! Looking up socket " + channel);
-  var socket = Clients[channel];
-  if (socket == null || !socket.connected) {
-    console.log("Client is not online, queueing message IN REDIS" + getQueueName(channel));
-    redisClient.rpush(getQueueName(channel), message);
-    redisClient.lrange(getQueueName(channel), 0, -1, function(error, result) {
-      console.log("DEBUG: redis server returned " + result);
-      console.log(JSON.stringify(result));
+function onNewServerMessage(channel, message) {
+    console.log("New message from channel " + channel);
+    if(channel.indexOf(RM_CHANNEL_PREFIX + RM_USERS_PREFIX) === 0) {
+        uid = channel.substring((RM_CHANNEL_PREFIX + RM_USERS_PREFIX).length);
+        console.log("User ID for this message is " + uid);
+        passMessage(uid, message);
+    } else {
+        console.log("Channel was not user-targeted.");
+    }
+}
+
+//"Pass" a message to a UID. This means sending it if they're online, and queueing it if they're not.
+function passMessage(uid, message) {
+    var socket = Clients[uid];
+    if (socket == null || !socket.connected) {
+        console.log("Client is not online, queueing message in Redis list " + getQueueName(uid));
+        enqueueMessage(uid, message);
+
+        //Print existing messages
+        /*redisClient.lrange(getQueueName(uid), 0, -1, function (error, result) {
+            console.log("DEBUG: redis server returned " + result);
+            console.log(JSON.stringify(result));
+        });*/
+
+    } else {
+        console.log("Sending message " + message + " to " + uid + " on socket " + socket.id);
+        socket.emit('message', message);
+    }
+}
+
+function enqueueMessage(uid, message) {
+    redisClient.rpush(getQueueName(uid), message);
+}
+
+function dequeueMessage(uid, message) {
+    console.log("Dequeuing message for " + uid + ": " + message);
+    passMessage(uid, message);
+}
+
+function purgeMessageQueue(uid) {
+    var messages = [];
+    var queue = getQueueName(uid);
+    redisClient.lrange(queue, 0, -1, function(error, result) {
+        if(result.length !== 0) {
+            messages = result;
+            redisClient.del(queue);
+
+            console.log(queue + " has " + messages.length + " messages enqueued, purging!");
+            messages.forEach(function (message) {
+                dequeueMessage(uid, message);
+            });
+        } else {
+            console.log(queue + " has 0 messages enqueued.");
+        }
     });
-  }
-
-  else {
-    console.log("Sending message " + message + " to " + socket.id);
-    socket.emit(MESSAGE_SUBJECT, message);
-  }
 }
 
-function onQueuedMessage(uid, channel, message) {
-  console.log(uid + " - Purging message " + message);
-  var socket = Clients[uid];
-  if (socket == null) {
-    console.log("Client is no longer online, recommitting to queue");
-    redisClient.rpush(channel, message);
-    return;
-  }
-
-  socket.emit(MESSAGE_SUBJECT, message);
-
+function getChannelName(uid) {
+    return RM_CHANNEL_PREFIX + RM_USERS_PREFIX + uid;
 }
 
-function getChannelName(id) {
-  return RM_CHANNEL_PREFIX + id;
-}
-
-function getQueueName(id) {
-  return (REDIS_KEY_PREFIX + REDIS_USERS_PREFIX + id + REDIS_MESSAGES);
+function getQueueName(uid) {
+    return REDIS_KEY_PREFIX + REDIS_USERS_PREFIX + uid + ':messages';
 }
