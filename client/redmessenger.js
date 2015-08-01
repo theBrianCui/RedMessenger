@@ -1,8 +1,9 @@
 //RedMessenger Client Configuration
 
-function RedMessenger(url, userID) {
+function RedMessenger(url, userID, userKey) {
     this.url = url;
     this.userID = userID;
+    this.userKey = userKey || '';
 
     this.onMessage =  function(msg) {
         console.log('RedMessage! ' + msg);
@@ -15,7 +16,9 @@ function RedMessenger(url, userID) {
             console.log('RedMessenger Connected!');
             console.log('Sending identifier ' + userID);
 
-            socket.emit('identifier', this.userID);
+            socket.emit('identifier', this.userID +
+                (this.userKey ? ':' + this.userKey : '')
+            );
 
             socket.on('message', function (msg) {
                 this.onMessage(msg);
@@ -26,4 +29,4 @@ function RedMessenger(url, userID) {
     }
 }
 
-var rm = new RedMessenger('http://seanc-linux:8080/rm', 'brianc');
+var rm = new RedMessenger('http://localhost:8080/rm', 'brianc', '1234');

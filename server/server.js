@@ -7,12 +7,18 @@ var SocketIO = require('socket.io')(Http);
 var SocketIOConnection = 'connection';
 
 // TODO: Refactor into a config.json
-var REDIS_HOST = "nm-hackathon";
+var REDIS_HOST = "localhost";
 var WS_PORT = 8080;
 var REDIS_PORT = 6379;
+var SECURE_MODE = true;
 
 var RM_ROUTE = '/rm';
-var REDIS_NEW_MESSAGE = 'pmessage';
+var REDIS_NEW_MESSAGE = 'pmessage'; //Note: hardcoded, can't be edited
+
+//Name and Namespace constants
+var REDIS_KEY_PREFIX = 'rm:';
+var REDIS_USERS_PREFIX = 'users:';
+
 var MESSAGE_SUBJECT = 'message';
 var IDENTIFIER_SUBJECT = 'identifier';
 var RM_CHANNEL_PREFIX = 'rm.';
@@ -28,13 +34,18 @@ function onListenDebug() {
 }
 
 // Connect to Redis instance
-var redis = new Redis(
-  host = REDIS_HOST,
-  port = REDIS_PORT
-);
+var redisSubscriber = new Redis({
+    host: REDIS_HOST,
+    port: REDIS_PORT
+});
 
-redis.psubscribe(RM_CHANNEL_PREFIX + '*', onSubscribeDebug);
-redis.on(REDIS_NEW_MESSAGE, onNewMessage);
+var redisClient = new Redis({
+    host: REDIS_HOST,
+    port: REDIS_PORT
+});
+
+redisSubscriber.psubscribe(RM_CHANNEL_PREFIX + '*', onSubscribeDebug);
+redisSubscriber.on(REDIS_NEW_MESSAGE, onNewMessage);
 
 function onSubscribeDebug(error, count) {
   console.log("We're now subscribed to " + count + " channels on Redis.");
@@ -63,8 +74,32 @@ function onConnect(socket) {
 }
 
 function onIdentityRecv(socket, id) {
-  console.log("Assigning id " + id + " to socket " + socket.id);
-  Clients[RM_CHANNEL_PREFIX + id] = socket;
+    var idKey = id.split(':');
+    var uid = idKey[0];
+    var key = idKey[1];
+    if(!SECURE_MODE) {
+        assignClientSocket(socket, uid);
+    } else if(key) {
+        console.log("Verifying user key...");
+        redisClient.get(REDIS_KEY_PREFIX + REDIS_USERS_PREFIX + uid + ':key',
+            function(err, result) {
+                console.log("Redis response: " + err + ", " + result);
+                if(!err && result === key) {
+                    socket.emit(MESSAGE_SUBJECT, "Identity verified! " + uid);
+                    assignClientSocket(socket, uid);
+                } else {
+                    socket.on(IDENTIFIER_SUBJECT, null);
+                }
+            })
+    } else {
+        console.log("User key was not provided for " + uid);
+        socket.on(IDENTIFIER_SUBJECT, null);
+    }
+}
+
+function assignClientSocket(socket, id) {
+    console.log("Assigning id " + id + " to socket " + socket.id);
+    Clients[RM_CHANNEL_PREFIX + id] = socket;
 }
 
 function onNewMessage(pattern, channel, message) {
