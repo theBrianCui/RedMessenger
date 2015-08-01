@@ -73,7 +73,10 @@ function onConnect(socket) {
 }
 
 function purgeMessageQueue(channel) {
-  var messages = redisQueue.lrange(channel, 0, -1);
+  var messages = [];
+  redisQueue.lrange(channel, 0, -1, function(error, result) {
+    messages = result;
+  });
   redisQueue.del(channel);
   console.log(channel + " has " + messages.length + " messages enqueued, purging!");
   messages.forEach(function(message) {
