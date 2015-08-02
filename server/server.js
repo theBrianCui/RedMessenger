@@ -5,8 +5,6 @@ var SocketIO = require('socket.io')(Http);
 var Config = require('./config.json');
 
 // Constants
-
-// TODO: Refactor into a config.json
 var REDIS_HOST = Config.redis_host;
 var WS_PORT = Config.ws_port;
 var REDIS_PORT = Config.redis_port;
@@ -148,9 +146,6 @@ function onNewServerMessage(channel, message) {
 }
 
 function generateMetadata(channel, message) {
-    console.log("DEBUG_METADATA_1, " + message);
-    console.log("DEBUG_METADATA_2, " + encodeURI(message));
-
     return {
         'source': channel,
         'timestamp': Date.now(),
