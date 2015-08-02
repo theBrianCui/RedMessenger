@@ -7,7 +7,9 @@
 PUBLISH rm.users.user1 "Hello, world!"
 (integer) 0
 ```
-**RedMessenger** is a Redis proxy server written for **Node.js** that ensures that there's always someone listening on your Redis channel - even if no one's immediately there to hear it. It sits in between your Redis instance and your application, exposing a `WebSocket` (TBF)
+**RedMessenger** is a Redis proxy server written for **Node.js** that ensures that there's always someone listening on your Redis channel - even if no one's immediately there to hear it. It sits in between your Redis instance and your application, exposing a `WebSocket` on your app's side that delivers a Redis `PUBLISH` message to a user on your app.   
+  
+If the user isn't there, that's OK! It'll save that message to that user back on your Redis server. When your user comes back on, it'll handle grabbing all the missed `PUBLISH`es since last time and send them over the `WebSocket`.
 
 ## How does it work?
 
@@ -102,6 +104,10 @@ user1: Purging message 'Meow!' from rm.cats
 "LRANGE" "rm:users:user1:messages" "0" "-1"
 "DEL" "rm:users:user1:messages"
 ```
+
+## API
+
+
 
 ## Value namespaces
 
