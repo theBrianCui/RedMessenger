@@ -176,6 +176,8 @@ function passMessage(uid, message) {
 
         if(!(socketCollection[socket] == null || !socketCollection[socket].connected)){
             anyConn = true;
+            message = JSON.parse(message);
+            console.log("DEBUG_decode: " + message.payload);
             message.payload = decodeURI(message.payload);
             console.log("Sending message " + message.payload + " to " + uid + " on socket " + socketCollection[socket].id);
             socketCollection[socket].emit('message', message);
