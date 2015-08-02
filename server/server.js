@@ -2,16 +2,16 @@ var Redis = require('ioredis');
 var Express = require('express')();
 var Http = require('http').Server(Express);
 var SocketIO = require('socket.io')(Http);
+var Config = require('./config.json');
 
 // Constants
-var SocketIOConnection = 'connection';
 
 // TODO: Refactor into a config.json
-var REDIS_HOST = "nm-hackathon";
-var WS_PORT = 8080;
-var REDIS_PORT = 6379;
-var SECURE_MODE = true;
-var RM_ROUTE = '/rm';
+var REDIS_HOST = Config.redis_host;
+var WS_PORT = Config.ws_port;
+var REDIS_PORT = Config.redis_port;
+var SECURE_MODE = Config.secure_mode;
+var RM_ROUTE = Config.rm_route;
 
 //Name and Namespace constants
 //Redis Key Naming
@@ -59,7 +59,7 @@ function onDefaultPageRequest(request, response) {
 }
 
 // SocketIO connection events
-Server.on(SocketIOConnection, onConnect);
+Server.on('connection', onConnect);
 
 function onConnect(socket) {
     console.log(socket.id + ": New connection! Waiting for ID");
