@@ -106,8 +106,8 @@ user1: Purging message 'Meow!' from rm.cats
 ```
 
 ## API
-
-
+### `subscribe(uid[, auth_key])`
+Subscribes to `rm.users.$uid` and any group in `rm.groups.$gid` that `uid` is subscribed to (has an entry in `rm:groups:$gid:members`). Recieves all queued messages from `rm:users:$uid:messages` immediately.
 
 ## Value namespaces
 
