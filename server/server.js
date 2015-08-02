@@ -150,6 +150,7 @@ function jsonify(channel, message) {
     return {
         'source': channel,
         'timestamp': Date.now(),
+        'bubble': false,
         'payload': message
     };
 }
@@ -162,11 +163,15 @@ function passMessage(uid, message) {
     //Iterate over the connections of the client.
     //  If the client is connected, send the message and mark that there was a connection
     //  If no client in the array of connections is connected, do nothing.
+    var count = 0;
     for(var socket in socketCollection){
+        if (count == 0)
+          message.bubble = true;
         if(!(socketCollection[socket] == null || !socketCollection[socket].connected)){
             anyConn = true;
             console.log("Sending message " + message + " to " + uid + " on socket " + socketCollection[socket].id);
             socketCollection[socket].emit('message', message);
+            count++;
         }
     }
 
