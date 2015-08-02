@@ -5,6 +5,8 @@ function RedMessenger(url, userID, userKey) {
     this.userID = userID;
     this.userKey = userKey || '';
     var notifList = setup();
+    var notifQueue = [];
+    var i = 0;
 
     this.onMessage =  function(msg) {
         var notification = document.createElement("div");
@@ -15,16 +17,21 @@ function RedMessenger(url, userID, userKey) {
 
         var title = document.createElement("div");
         title.className = 'title';
-        title.innerHTML = 'Title';
+        title.innerHTML = 'Title ' + i;
+        i++;
 
         var shortBody = document.createElement("div");
         shortBody.className = 'short-body';
         shortBody.innerHTML = 'Message appears here...'
 
-        notifList.appendChild(notification);
+        notifList.insertBefore(notification, notifList.firstChild);
         notification.appendChild(icon);
         notification.appendChild(title);
         notification.appendChild(shortBody);
+        notifQueue.push(notification);
+        if (notifQueue.length > 6) {
+        	notifList.removeChild(notifQueue.shift());
+        }
     };
 
     function setup() {
