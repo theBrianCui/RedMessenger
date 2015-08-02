@@ -12,6 +12,7 @@ var WS_PORT = Config.ws_port;
 var REDIS_PORT = Config.redis_port;
 var SECURE_MODE = Config.secure_mode;
 var RM_ROUTE = Config.rm_route;
+var CONN_LIMIT = (Config.conn_limit > 99 || Config.conn_limit < 1) ? 99 : Config.conn_limit;
 var EXPIRY_TIME = Config.queue_expiry;
 
 //Name and Namespace constants
@@ -27,6 +28,7 @@ var RM_CHANNELS_PREFIX = 'channels.';
 
 var Server = SocketIO.of(RM_ROUTE);
 var Clients = {};
+var ConnCounter = {};
 
 // SocketIO listen
 Http.listen(WS_PORT, onListenDebug);
@@ -108,7 +110,22 @@ function onIdentityRecv(socket, id, callback) {
 
 function assignClientSocket(socket, uid) {
     console.log("Assigning id " + uid + " to socket " + socket.id);
-    Clients[uid] = socket;
+    //If the attribute uid of object Clients does not excist, create it (an array)
+    //Otherwise, it exists and we are going to push to it
+    if(!Clients[uid]) {
+        Clients[uid] = [socket];
+        ConnCounter[uid] = 1;
+    }else {
+        ConnCounter[uid] = ConnCounter[uid] % CONN_LIMIT;
+        var targetSocket = Clients[uid][ConnCounter[uid]];
+
+        //Forcibly disconnect the old socket
+        if(targetSocket && targetSocket.connected)
+            targetSocket.disconnect();
+
+        Clients[uid][ConnCounter[uid]] = socket;
+        ConnCounter[uid]++;
+    }
 }
 
 function onNewServerMessage(channel, message) {
@@ -130,20 +147,30 @@ function onNewServerMessage(channel, message) {
 
 //"Pass" a message to a UID. This means sending it if they're online, and queueing it if they're not.
 function passMessage(uid, message) {
-    var socket = Clients[uid];
-    if (socket == null || !socket.connected) {
+    var socketCollection = Clients[uid];
+    var anyConn = false;
+
+    //Iterate over the connections of the client.
+    //  If the client is connected, send the message and mark that there was a connection
+    //  If no client in the array of connections is connected, do nothing.
+    for(var socket in socketCollection){
+        if(!(socketCollection[socket] == null || !socketCollection[socket].connected)){
+            anyConn = true;
+            console.log("Sending message " + message + " to " + uid + " on socket " + socketCollection[socket].id);
+            socketCollection[socket].emit('message', message);
+        }
+    }
+
+    //If no connection was stablished, we requeue the message to Redis
+    if(!anyConn){
         console.log("Client is not online, queueing message in Redis list " + getQueueName(uid));
         enqueueMessage(uid, message);
 
         //Print existing messages
         /*redisClient.lrange(getQueueName(uid), 0, -1, function (error, result) {
-            console.log("DEBUG: redis server returned " + result);
-            console.log(JSON.stringify(result));
-        });*/
-
-    } else {
-        console.log("Sending message " + message + " to " + uid + " on socket " + socket.id);
-        socket.emit('message', message);
+         console.log("DEBUG: redis server returned " + result);
+         console.log(JSON.stringify(result));
+         });*/
     }
 }
 
