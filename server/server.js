@@ -145,7 +145,10 @@ function enqueueMessage(uid, message) {
     redisClient.pipeline()
       .rpush(queueName, message)
       .expire(queueName, EXPIRY_TIME)
-      .exec();
+      .exec(function(error, result) {
+          if (error)
+            console.log("Error queueing message: " + error);
+      });
 }
 
 function dequeueMessage(uid, message) {
