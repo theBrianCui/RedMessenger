@@ -176,8 +176,7 @@ function passMessage(uid, message) {
 
         if(!(socketCollection[socket] == null || !socketCollection[socket].connected)){
             anyConn = true;
-            message = JSON.parse(message);
-            console.log("DEBUG_decode: " + message.payload);
+
             message.payload = decodeURI(message.payload);
             console.log("Sending message " + message.payload + " to " + uid + " on socket " + socketCollection[socket].id);
             socketCollection[socket].emit('message', message);
@@ -215,6 +214,7 @@ function distributeMessage(cid, message) {
     );
 }
 
+//Store the message as a JSON string
 function enqueueMessage(uid, message) {
     var queueName = getQueueName(uid);
 
@@ -227,6 +227,7 @@ function enqueueMessage(uid, message) {
       });
 }
 
+//Retrieve JSON string messages and parse them
 function purgeMessageQueue(uid) {
     var messages = [];
     var queue = getQueueName(uid);
@@ -238,7 +239,7 @@ function purgeMessageQueue(uid) {
             console.log(queue + " has " + messages.length + " messages enqueued, purging!");
             messages.forEach(function (message) {
                 console.log("Dequeuing message for " + uid + ": " + message);
-                passMessage(uid, message);
+                passMessage(uid, JSON.parse(message));
             });
         } else {
             console.log(queue + " has 0 messages enqueued.");
