@@ -2,12 +2,14 @@
 
 #### If a Redis instance `PUBLISH`es to a channel with no `SUBSCRIBE`rs, does it make a sound?
 
-#### RedMessenger
+#### Redis
 ```
 PUBLISH rm.users.user1 "Hello, world!"
 (integer) 0
 ```
-**RedMessenger** is a Redis proxy server written for **Node.js** that ensures that there's always someone listening on your Redis channel - even if no one's immediately there to hear it. It sits in between your Redis instance and your application, exposing a `WebSocket` (TBF)
+**RedMessenger** is a Redis proxy server written for **Node.js** that ensures that there's always someone listening on your Redis channel - even if no one's immediately there to hear it. It sits in between your Redis instance and your application, exposing a `WebSocket` on your app's side that delivers a Redis `PUBLISH` message to a user on your app.   
+  
+If the user isn't there, that's OK! It'll save that message to that user back on your Redis server. When your user comes back on, it'll handle grabbing all the missed `PUBLISH`es since last time and send them over the `WebSocket`.
 
 ## How does it work?
 
@@ -74,8 +76,8 @@ We gotcha covered!
 #### Redis
 ```
 "RPUSH" "rm:users:user1:messages" "Hello, world!"
-"RPUSH" "rm:groups:cats:messages" "Meow!"
-"LRANGE" "rm:groups:cats:members" "0" "-1"
+"RPUSH" "rm:channels:cats:messages" "Meow!"
+"LRANGE" "rm:channels:cats:members" "0" "-1"
 "RPUSH" "rm:users:user1:messages" "Meow!"
 "RPUSH" "rm:users:user2:messages" "Meow!"
 ```
@@ -84,7 +86,7 @@ We gotcha covered!
 ```
 New message from channel rm.users.user1
 Client is not online, queueing message in Redis (rm:users:user1:messages)
-New message from channel rm.groups.cats
+New message from channel rm.channels.cats
 Client is not online, queueing message in Redis (rm:users:user1:messages)
 Client is not online, queueing message in Redis (rm:users:user2:messages)
 user5: Sending message 'Meow!' from rm.cats
@@ -103,24 +105,67 @@ user1: Purging message 'Meow!' from rm.cats
 "DEL" "rm:users:user1:messages"
 ```
 
+## Message format
+Every message contains some metadata and a message payload.
+```javascript
+{
+  source: 'rm.users.user1',
+  timestamp: 1438480701712,
+  bubble: true,
+  payload: '...'
+}
+```
+
+#### `source`
+What channel the message originated from. For a one-to-one message, this will be `rm.users.$uid`; for a one-to-many message, this will be `rm.groups.$cid`.
+
+#### `timestamp`
+The time this message was originally `PUBLISH`ed, in Unix time.
+
+#### `bubble`
+Directive that this message should be displayed on the desktop, if the browser supports desktop notifications. Set to `true` on the first `WebSocket` established for this user, and `false` on further concurrent `WebSockets` opened.
+
+This is to prevent multiple tabs identifying as the same user from spawning one desktop notification _each_ on a single message.
+
+#### `payload`
+The message payload that was `PUBLISH`ed. This can be whatever you want! (JSON, plaintext, a hash value...)
+
+## API
+#### `subscribe(uid[, auth_key])`
+Subscribes to `rm.users.$uid` and any group in `rm.channels.$cid` that `uid` is subscribed to (has an entry in `rm:channels:$cid:subscribers`). Recieves all queued messages from `rm:users:$uid:messages` immediately. 
+
+If an `auth_key` is provided, attempts to match it against the value in `rm:users:$uid:key` - if it doesn't match, does nothing.
+
 ## Value namespaces
 
-### `rm:users:$uid:messages`
+#### `rm:users:$uid:messages`
 Holds user `$uid`'s specific message queue.
 
-### `rm:users:$uid:key`
+#### `rm:users:$uid:key`
 Holds user `$uid`'s specific authentication token.
 
-### `rm:groups:$gid:members`
-Holds a list of members to deliver a message to `rm:groups:$gid` to.
+#### `rm:channels:$cid:subscribers`
+Holds a list of members to deliver a message to `rm:channels:$cid` to.
 
 ## Channel namespaces
 
-### `rm.users.$uid`
+#### `rm.users.$uid`
 `PUBLISH`ing to this channel will deliver a message to `$uid` directly.
 
-### `rm.groups.$gid`
-`PUBLISH`ing to this channel will deliver a message to all `$uid`s subscribed to `$gid`.
+#### `rm.channels.$cid`
+`PUBLISH`ing to this channel will deliver a message to all `$uid`s subscribed to `$cid`.
 
 ## Example direct message flow
-* Send a message to **user1!**
+### Send a message to **`user1`!**
+* **Redis** Deliver the message to the **`rm.users.user1`** channel.
+* **RedMessenger** If `user1` is online, deliver the message to `user1` over their `WebSocket`!
+* **RedMessenger** If `user1` isn't online, store the message in `rm:users:user1:messages`.
+* **RedMessenger** When `user1` is active on our `WebSocket`, send `user1` all messages from `rm:users:user1:messages` over their `WebSocket`.
+
+## Example group message flow
+### Send a message to **`cats`!**
+* **Redis** Deliver the message to the **`rm.channels.cats`** channel.
+* **RedMessenger** For every `$user` in **`rm:channels:cats:subscribers`** ...
+* **RedMessenger** If `$user` is online, deliver the message to `$user` over their `WebSocket`!
+* **RedMessenger** If `$user` isn't online, store the message in `rm:users:$user:messages`.
+* **RedMessenger** When `$user` is active on our `WebSocket`, send `$user` all messages from `rm:users:$user:messages`, including the one delivered to **`rm.channels.cats`** over their `WebSocket`.
