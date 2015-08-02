@@ -169,7 +169,7 @@ function passMessage(uid, message) {
           message.bubble = true;
         if(!(socketCollection[socket] == null || !socketCollection[socket].connected)){
             anyConn = true;
-            console.log("Sending message " + message + " to " + uid + " on socket " + socketCollection[socket].id);
+            console.log("Sending message " + message.payload + " to " + uid + " on socket " + socketCollection[socket].id);
             socketCollection[socket].emit('message', message);
             count++;
         }
@@ -209,7 +209,7 @@ function enqueueMessage(uid, message) {
     var queueName = getQueueName(uid);
 
     redisClient.pipeline()
-      .rpush(queueName, message)
+      .rpush(queueName, JSON.stringify(message))
       .expire(queueName, EXPIRY_TIME)
       .exec(function(error, result) {
           if (error)
@@ -228,7 +228,7 @@ function purgeMessageQueue(uid) {
             console.log(queue + " has " + messages.length + " messages enqueued, purging!");
             messages.forEach(function (message) {
                 console.log("Dequeuing message for " + uid + ": " + message);
-                passMessage(uid, message);
+                passMessage(uid, JSON.parse(message));
             });
         } else {
             console.log(queue + " has 0 messages enqueued.");

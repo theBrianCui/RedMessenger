@@ -22,7 +22,7 @@ function RedMessenger(url, userID, userKey) {
 
         var shortBody = document.createElement("div");
         shortBody.className = 'short-body';
-        shortBody.innerHTML = 'Message appears here...'
+        shortBody.innerHTML = msg.payload;
 
         notifList.insertBefore(notification, notifList.firstChild);
         notification.appendChild(icon);
@@ -65,4 +65,4 @@ function RedMessenger(url, userID, userKey) {
     }
 }
 
-var rm = new RedMessenger('http://localhost:8080/rm', 'brianc', '1234');
+var rm = new RedMessenger('http://localhost:8080/rm', 'seanc', '1234');
