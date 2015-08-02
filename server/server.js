@@ -167,11 +167,6 @@ function enqueueMessage(uid, message) {
     redisClient.rpush(getQueueName(uid), message);
 }
 
-function dequeueMessage(uid, message) {
-    console.log("Dequeuing message for " + uid + ": " + message);
-    passMessage(uid, message);
-}
-
 function purgeMessageQueue(uid) {
     var messages = [];
     var queue = getQueueName(uid);
@@ -182,7 +177,8 @@ function purgeMessageQueue(uid) {
 
             console.log(queue + " has " + messages.length + " messages enqueued, purging!");
             messages.forEach(function (message) {
-                dequeueMessage(uid, message);
+                console.log("Dequeuing message for " + uid + ": " + message);
+                passMessage(uid, message);
             });
         } else {
             console.log(queue + " has 0 messages enqueued.");
