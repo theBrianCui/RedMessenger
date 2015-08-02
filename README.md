@@ -7,14 +7,13 @@
 PUBLISH rm.users.user1 "Hello, world!"
 (integer) 0
 ```
-**RedMessenger** is a Redis proxy server written for **Node.js** that ensures that there's always someone listening on your Redis channel - even if no one's immediately there to hear it. It sits in between your Redis instance and your application, exposing a `WebSocket` on your app's side that delivers a Redis `PUBLISH` message to a user on your app.   
+**RedMessenger** is a Redis proxy written for **Node.js** that ensures that there's always someone listening on your Redis channel - even if no one's immediately there to hear it. It sits in between your Redis instance and your application, exposing a `WebSocket` on your app's side that delivers a Redis `PUBLISH` message to a user on your app.   
   
 If the user isn't there, that's OK! It'll save that message to that user back on your Redis server. When your user comes back on, it'll handle grabbing all the missed `PUBLISH`es since last time and send them over the `WebSocket`.
 
 ## How does it work?
 
 As part of its queuing mechanism, RedMessenger will take messages with no immediate responder and send them back to Redis. 
-
 
 ```
 New message from channel rm.users.user1
@@ -92,11 +91,28 @@ This is to prevent multiple tabs identifying as the same user from spawning one 
 #### `payload`
 The message payload that was `PUBLISH`ed. This can be whatever you want! (JSON, plaintext, a hash value...)
 
-## API
-#### `subscribe(uid[, auth_key])`
-Subscribes to `rm.users.$uid` and any group in `rm.channels.$cid` that `uid` is subscribed to (has an entry in `rm:channels:$cid:subscribers`). Recieves all queued messages from `rm:users:$uid:messages` immediately. 
+## How do I hook it up?
+Write a client to handle `server/server.js`. An example one is provided for you in `client/redmessenger.js`!
 
-If an `auth_key` is provided, attempts to match it against the value in `rm:users:$uid:key` - if it doesn't match, does nothing.
+Here's what you need to do:
+
+* In `server/config.json`, configure the configuration options according to your setup:<br/>
+**`redis_host`**: The ip address/hostname of your running Redis instance.<br />
+**`redis_port`**: The port that your Redis instance is listening on.<br />
+**`ws_port`**: The port that your `RedMessenger` server should open a `WebSocket` on.<br />
+**`secure_mode`**: If `true`, requires users to authenticate. Connections to a user's message queue must be coupled with a string that matches a user's `rm:users:$uid:key` string on Redis, or no messages will be delivered.<br />
+**`rm_route`**: The route that the `WebSocket` on `RedMessenger` should listen on.<br />
+**`queue_expiry`**: The expiration time for a user's message queue, in seconds. When it expires, clears out a user's entire message queue.<br />
+**`conn_limit`**: The maximum number of parallel connections `RedMessenger` can accomodate on its `WebSocket`.<br />
+* Open a `socket.io` socket on the `WebSocket` route defined on your server's `server/config.json`.
+* Define an `on('connect')` event handler that sends over a `uid` (and `key` if `secure_mode` is `true`) upon opening a socket to RedMessenger.
+* Define an `on('message')` event handler that does something with a message delivered by RedMessenger. The message will be [an object](#message-format).
+
+### Here's an example!
+```javascript
+
+```
+
 
 ## Value namespaces
 
