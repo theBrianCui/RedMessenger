@@ -110,7 +110,35 @@ Here's what you need to do:
 
 ### Here's an example!
 ```javascript
-
+function RedMessenger(url, userId, userKey) {
+  this.url = url;
+  this.userId = userId;
+  this.userKey = userKey || '';
+  
+  var socket; // Our sockets.io socket
+  if (io) {
+    socket = io(this.url);
+    socket.on('connect', function() {
+      console.log("Connected to RedMessenger!");  
+      
+      var identifier = this.generateIdentifier();  
+      console.log("Authenticating...");
+      socket.emit('identifier', identifier);
+    }.bind(this));
+    
+    socket.on('message', function(message) {
+      this.onMessage(message);
+    }.bind(this));
+  }
+  
+  this.onMessage = function(message) {
+    console.log("Message from " + message.source + ": " + message.payload);
+  }
+  
+  this.generateIdentifier = function () {
+    return this.userId + ":" + this.userKey;
+  }
+}
 ```
 
 
