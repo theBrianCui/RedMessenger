@@ -5,8 +5,6 @@ var SocketIO = require('socket.io')(Http);
 var Config = require('./config.json');
 
 // Constants
-
-// TODO: Refactor into a config.json
 var REDIS_HOST = Config.redis_host;
 var WS_PORT = Config.ws_port;
 var REDIS_PORT = Config.redis_port;
@@ -28,6 +26,10 @@ var RM_CHANNELS_PREFIX = 'channels.';
 var Server = SocketIO.of(RM_ROUTE);
 var Clients = {};
 
+var LOG_SERVER_PREFIX = "server:";
+var LOG_SOCKET_PREFIX = "socket/";
+var LOG_USER_PREFIX = "user/";
+
 // SocketIO listen
 Http.listen(WS_PORT, onListenDebug);
 
@@ -47,7 +49,8 @@ var redisClient = new Redis({
 });
 
 redisSubscriber.psubscribe(RM_GLOBAL_PREFIX + '*', function (error, count) {
-    console.log("We're now subscribed to " + count + " channels on Redis.");
+    console.log(LOG_SERVER_PREFIX +
+      "We're now subscribed to " + count + " channels on Redis.");
 });
 redisSubscriber.on('pmessage', function(pattern, channel, message) {
     onNewServerMessage(channel, message)
@@ -57,7 +60,7 @@ redisSubscriber.on('pmessage', function(pattern, channel, message) {
 Express.get(RM_ROUTE, onDefaultPageRequest);
 
 function onDefaultPageRequest(request, response) {
-    console.log(request.ip + ": Sending default request response");
+    console.log(LOG_SOCKET_PREFIX + request.ip + ": Sending default request response");
     response.send("Hey, you're connected!");
 }
 
@@ -65,7 +68,7 @@ function onDefaultPageRequest(request, response) {
 Server.on('connection', onConnect);
 
 function onConnect(socket) {
-    console.log(socket.id + ": New connection! Waiting for ID");
+    console.log(LOG_SOCKET_PREFIX + socket.id + ": New connection! Waiting for ID");
 
     socket.on('identifier', function (message) {
         onIdentityRecv(socket, message, function(uid) {
@@ -85,12 +88,12 @@ function onIdentityRecv(socket, id, callback) {
 
     } else if(key) {
 
-        console.log("Verifying user key...");
-        console.log("Performing GET " + REDIS_GLOBAL_PREFIX + REDIS_USERS_PREFIX + uid + ':key');
+        console.log(LOG_SOCKET_PREFIX + ": Verifying user key...");
+        console.log(LOG_SOCKET_PREFIX + ": Performing GET " + REDIS_GLOBAL_PREFIX + REDIS_USERS_PREFIX + uid + ':key');
 
         redisClient.get(REDIS_GLOBAL_PREFIX + REDIS_USERS_PREFIX + uid + ':key',
             function(err, result) {
-                console.log("Redis response: " + err + ", " + result);
+                console.log(LOG_SOCKET_PREFIX + ": Redis response: " + err + ", " + result);
                 if(!err && result === key) {
                     console.log("Identity verified for " + uid);
                     assignClientSocket(socket, uid);
