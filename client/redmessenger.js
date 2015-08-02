@@ -32,6 +32,9 @@ function RedMessenger(url, userID, userKey) {
         if (notifQueue.length > 6) {
         	notifList.removeChild(notifQueue.shift());
         }
+        window.setTimeout(function() { 
+        	notification.classList.add('notification-fade');
+        }, 3000);
     };
 
     function setup() {
