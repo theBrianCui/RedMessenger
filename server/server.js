@@ -16,24 +16,23 @@ var RM_ROUTE = Config.rm_route;
 var CONN_LIMIT = (Config.conn_limit > 99 || Config.conn_limit < 1) ? 99 : Config.conn_limit;
 var EXPIRY_TIME = Config.queue_expiry;
 
+var numThreads = require('os').cpus().length;
+if (Config.cluster.max_threads > 0 && numThreads > Config.cluster.max_threads)
+    numThreads = Config.cluster.max_threads;
 if (Config.cluster.enabled) {
     if (Cluster.isMaster) {
-        console.log("I'm a master!");
 
-        var numCPUs = require('os').cpus().length;
-        if (Config.cluster.max_threads > 0 && numCPUs > Config.cluster.max_threads)
-            numCPUs = Config.cluster.max_threads;
-
-        console.log("This computer has " + numCPUs + " CPUs.");
-        for (var i = 0; i < numCPUs; i++) {
+        console.log("This computer has " + numThreads + " CPUs.");
+        for (var i = 0; i < numThreads; i++) {
             Cluster.settings.args = ['' + i];
             Cluster.fork();
         }
     } else {
-        console.log("I'm a worker! " + JSON.stringify(process.argv));
         WS_PORT += parseInt(process.argv[process.argv.length - 1]);
         init();
     }
+} else {
+    init();
 }
 
 function init() {
@@ -71,6 +70,26 @@ function init() {
         port: REDIS_PORT
     });
 
+    //Clear out existing online stats
+
+    var userSet = REDIS_GLOBAL_PREFIX + REDIS_USERS_PREFIX;
+    userSet = userSet.substring(0, userSet.length - 1);
+    console.log('Getting SMEMBERS for ' + userSet);
+    redisClient.smembers(userSet, function (err, result){
+        console.log('Result: ' + JSON.stringify(result));
+        if(result.length > 0) {
+            var keys = [];
+            result.forEach(function(uid) {
+                keys.push(REDIS_GLOBAL_PREFIX + REDIS_USERS_PREFIX + uid + ":online")
+            });
+            redisClient.pipeline([
+                ['del'].concat(keys)
+            ]).exec(function(err, results) {
+                console.log("Purging online settings: " + err + results);
+            });
+        }
+    });
+
     redisSubscriber.psubscribe(RM_GLOBAL_PREFIX + '*', function (error, count) {
         console.log("We're now subscribed to " + count + " channels on Redis.");
     });
@@ -94,9 +113,22 @@ function init() {
 
         socket.on('identifier', function (message) {
             onIdentityRecv(socket, message, function (uid) {
+                redisClient.incr(REDIS_GLOBAL_PREFIX + REDIS_USERS_PREFIX + uid + ":online",
+                    function(err, result) {
+                        console.log(result + " of " + uid + " are online.");
+                    });
                 purgeMessageQueue(uid);
             });
         });
+
+        socket.on('disconnect', function() {
+            if(socket.rm.identified && socket.rm.uid) {
+                redisClient.decr(REDIS_GLOBAL_PREFIX + REDIS_USERS_PREFIX + socket.rm.uid + ":online",
+                    function (err, result) {
+                        console.log(result + " of " + socket.rm.uid + " are online.");
+                    });
+            }
+        })
     }
 
     function onIdentityRecv(socket, id, callback) {
@@ -135,7 +167,7 @@ function init() {
 
     function assignClientSocket(socket, uid) {
         console.log("Assigning id " + uid + " to socket " + socket.id);
-        //If the attribute uid of object Clients does not excist, create it (an array)
+        //If the attribute uid of object Clients does not exist, create it (an array)
         //Otherwise, it exists and we are going to push to it
         if (!Clients[uid]) {
             Clients[uid] = [socket];
@@ -151,24 +183,72 @@ function init() {
             Clients[uid][ConnCounter[uid]] = socket;
             ConnCounter[uid]++;
         }
+
+        socket.rm = {};
+        socket.rm.identified = true;
+        socket.rm.uid = uid;
     }
 
     function onNewServerMessage(channel, message) {
         console.log("New message from channel " + channel);
-        if (channel.indexOf(RM_GLOBAL_PREFIX + RM_USERS_PREFIX) === 0) {
+        if(Cluster.isMaster)
+            processServerMessage(channel, message);
+        else
+            checkIn(channel, message, processServerMessage);
+    }
 
-            var uid = channel.substring((RM_GLOBAL_PREFIX + RM_USERS_PREFIX).length);
+    function processServerMessage(channel, message) {
+        var msgType = getMessageType(channel);
+        if (msgType === 'user') {
+
+            var uid = getUID(channel);
             console.log("User ID for this message is " + uid);
             message = generateMetadata(channel, message);
             passMessage(uid, message);
 
-        } else if (channel.indexOf(RM_GLOBAL_PREFIX + RM_CHANNELS_PREFIX) === 0) {
+        } else if (msgType === 'channel') {
 
             var cid = channel.substring((RM_GLOBAL_PREFIX + RM_CHANNELS_PREFIX).length);
             console.log("Channel ID for this message is " + cid);
             distributeMessage(cid, message)
-
         }
+    }
+
+    function checkIn(channel, message, callback) {
+        var msgType = getMessageType(channel);
+
+        if(msgType === 'user') {
+            var uid = getUID(channel);
+            if(getMessageType(channel) === 'user' && uidLocallyConnected(uid)) {
+                callback(channel, message);
+            } else {
+                var hash = generateMessageHash(channel, message);
+                redisClient.multi().get(REDIS_GLOBAL_PREFIX + REDIS_USERS_PREFIX + uid + ':online')
+                    .hincrby(REDIS_GLOBAL_PREFIX + 'messages', hash, 1).exec(function (err, result) {
+                        console.log("Result: " + JSON.stringify(result));
+                        if (parseInt(result[0][1]) === 0 && result[1][1] === 1) {
+                            console.log("Worker " + parseInt(process.argv[process.argv.length - 1]) + " won the message race");
+                            callback(channel, message)
+                        } else if (result[1][1] >= numThreads - parseInt(result[0][1])) {
+                            redisClient.hdel(REDIS_GLOBAL_PREFIX + 'messages', hash, function (err, result) {
+                                if (err) console.log("Redis query failure: " + err);
+                            })
+                        }
+                    });
+            }
+        }
+    }
+
+    function generateMessageHash(channel, message) {
+        var str = channel + message;
+        var hash = 0, i, chr, len;
+        if (str.length == 0) return hash;
+        for (i = 0, len = str.length; i < len; i++) {
+            chr   = str.charCodeAt(i);
+            hash  = ((hash << 5) - hash) + chr;
+            hash |= 0; // Convert to 32bit integer
+        }
+        return hash;
     }
 
     function generateMetadata(channel, message) {
@@ -262,6 +342,28 @@ function init() {
                 console.log(queue + " has 0 messages enqueued.");
             }
         });
+    }
+
+    function uidLocallyConnected(uid) {
+        var socketCollection = Clients[uid];
+        for (var socket in socketCollection) {
+            if(!(socketCollection[socket] == null || !socketCollection[socket].connected))
+                return true;
+        }
+        return false;
+    }
+
+    function getMessageType(channel) {
+        if (channel.indexOf(RM_GLOBAL_PREFIX + RM_USERS_PREFIX) === 0) {
+            return 'user';
+        } else if (channel.indexOf(RM_GLOBAL_PREFIX + RM_CHANNELS_PREFIX) === 0) {
+            return 'channel';
+        }
+        return null;
+    }
+
+    function getUID(channel) {
+        return channel.substring((RM_GLOBAL_PREFIX + RM_USERS_PREFIX).length);
     }
 
     function getChannelName(uid) {
