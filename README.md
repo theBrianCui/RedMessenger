@@ -123,4 +123,16 @@ Holds a list of members to deliver a message to `rm:groups:$gid` to.
 `PUBLISH`ing to this channel will deliver a message to all `$uid`s subscribed to `$gid`.
 
 ## Example direct message flow
-* Send a message to **user1!**
+### Send a message to **`user1`!**
+* **Redis** Deliver the message to the **`rm.users.user1`** channel.
+* **RedMessenger** If `user1` is online, deliver the message to `user1` over their `WebSocket`!
+* **RedMessenger** If `user1` isn't online, store the message in `rm:users:user1:messages`.
+* **RedMessenger** When `user1` is active on our `WebSocket`, send `user1` all messages from `rm:users:user1:messages` over their `WebSocket`.
+
+## Example group message flow
+### Send a message to **`cats`!**
+* **Redis** Deliver the message to the **`rm.groups.cats`** channel.
+* **RedMessenger** For every `$user` in **`rm:groups:cats:members`** ...
+* **RedMessenger** If `$user` is online, deliver the message to `$user` over their `WebSocket`!
+* **RedMessenger** If `$user` isn't online, store the message in `rm:users:$user:messages`.
+* **RedMessenger** When `$user` is active on our `WebSocket`, send `$user` all messages from `rm:users:$user:messages`, including the one delivered to **`rm.groups.cats`** over their `WebSocket`.
