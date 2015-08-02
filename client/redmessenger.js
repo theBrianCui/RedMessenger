@@ -7,7 +7,6 @@ function RedMessenger(url, userID, userKey) {
     var notifList = setup();
 
     this.onMessage =  function(msg) {
-    	var test = "Wassup yo"
         var notification = document.createElement("div");
         notification.className = 'notification';
 
