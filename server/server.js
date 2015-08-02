@@ -15,12 +15,14 @@ var RM_ROUTE = Config.rm_route;
 
 //Name and Namespace constants
 //Redis Key Naming
-var REDIS_KEY_PREFIX = 'rm:';
+var REDIS_GLOBAL_PREFIX = 'rm:';
 var REDIS_USERS_PREFIX = 'users:';
+var REDIS_CHANNELS_PREFIX = 'channels:';
 
 //Redis PubSub Channel Naming
-var RM_CHANNEL_PREFIX = 'rm.';
+var RM_GLOBAL_PREFIX = 'rm.';
 var RM_USERS_PREFIX = 'users.';
+var RM_CHANNELS_PREFIX = 'channels.';
 
 var Server = SocketIO.of(RM_ROUTE);
 var Clients = {};
@@ -43,7 +45,7 @@ var redisClient = new Redis({
     port: REDIS_PORT
 });
 
-redisSubscriber.psubscribe(RM_CHANNEL_PREFIX + '*', function (error, count) {
+redisSubscriber.psubscribe(RM_GLOBAL_PREFIX + '*', function (error, count) {
     console.log("We're now subscribed to " + count + " channels on Redis.");
 });
 redisSubscriber.on('pmessage', function(pattern, channel, message) {
@@ -83,9 +85,9 @@ function onIdentityRecv(socket, id, callback) {
     } else if(key) {
 
         console.log("Verifying user key...");
-        console.log("Performing GET " + REDIS_KEY_PREFIX + REDIS_USERS_PREFIX + uid + ':key');
+        console.log("Performing GET " + REDIS_GLOBAL_PREFIX + REDIS_USERS_PREFIX + uid + ':key');
 
-        redisClient.get(REDIS_KEY_PREFIX + REDIS_USERS_PREFIX + uid + ':key',
+        redisClient.get(REDIS_GLOBAL_PREFIX + REDIS_USERS_PREFIX + uid + ':key',
             function(err, result) {
                 console.log("Redis response: " + err + ", " + result);
                 if(!err && result === key) {
@@ -110,12 +112,18 @@ function assignClientSocket(socket, uid) {
 
 function onNewServerMessage(channel, message) {
     console.log("New message from channel " + channel);
-    if(channel.indexOf(RM_CHANNEL_PREFIX + RM_USERS_PREFIX) === 0) {
-        uid = channel.substring((RM_CHANNEL_PREFIX + RM_USERS_PREFIX).length);
+    if(channel.indexOf(RM_GLOBAL_PREFIX + RM_USERS_PREFIX) === 0) {
+
+        var uid = channel.substring((RM_GLOBAL_PREFIX + RM_USERS_PREFIX).length);
         console.log("User ID for this message is " + uid);
         passMessage(uid, message);
-    } else {
-        console.log("Channel was not user-targeted.");
+
+    } else if (channel.indexOf(RM_GLOBAL_PREFIX + RM_CHANNELS_PREFIX) === 0) {
+
+        var cid = channel.substring((RM_GLOBAL_PREFIX + RM_CHANNELS_PREFIX).length);
+        console.log("Channel ID for this message is " + cid);
+        distributeMessage(cid, message)
+
     }
 }
 
@@ -136,6 +144,23 @@ function passMessage(uid, message) {
         console.log("Sending message " + message + " to " + uid + " on socket " + socket.id);
         socket.emit('message', message);
     }
+}
+
+//"Distribute" a message on a given CID. This means passing the message to each user on the channel.
+function distributeMessage(cid, message) {
+    console.log("Getting SMEMBERS for " + REDIS_GLOBAL_PREFIX + REDIS_CHANNELS_PREFIX + cid + ":subscribers");
+    redisClient.smembers(REDIS_GLOBAL_PREFIX + REDIS_CHANNELS_PREFIX + cid + ":subscribers",
+        function(err, result) {
+            if(!err && result.length !== 0) {
+                console.log("There are " + result.length + " recipients for channel " + cid);
+                result.forEach(function(uid) {
+                    passMessage(uid, message);
+                });
+            } else if (err) {
+                console.log("Redis connection error: " + err);
+            }
+        }
+    );
 }
 
 function enqueueMessage(uid, message) {
@@ -166,9 +191,9 @@ function purgeMessageQueue(uid) {
 }
 
 function getChannelName(uid) {
-    return RM_CHANNEL_PREFIX + RM_USERS_PREFIX + uid;
+    return RM_GLOBAL_PREFIX + RM_USERS_PREFIX + uid;
 }
 
 function getQueueName(uid) {
-    return REDIS_KEY_PREFIX + REDIS_USERS_PREFIX + uid + ':messages';
+    return REDIS_GLOBAL_PREFIX + REDIS_USERS_PREFIX + uid + ':messages';
 }
