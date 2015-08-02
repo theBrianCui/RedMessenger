@@ -107,15 +107,15 @@ user1: Purging message 'Meow!' from rm.cats
 
 ## API
 ### `subscribe(uid[, auth_key])`
-Subscribes to `rm.users.$uid` and any group in `rm.channels.$cid` that `uid` is subscribed to (has an entry in `rm:channels:$cid:subscribers`). Recieves all queued messages from `rm:users:$uid:messages` immediately.
+Subscribes to `rm.users.$uid` and any group in `rm.channels.$cid` that `uid` is subscribed to (has an entry in `rm:channels:$cid:subscribers`). Recieves all queued messages from `rm:users:$uid:messages` immediately. If an `auth_key` is provided, attempts to match it against the value in `rm:users:$uid:key` - if it doesn't match, does nothing.
 
 ## Value namespaces
 
-### `rm:users:$cid:messages`
-Holds user `$cid`'s specific message queue.
+### `rm:users:$uid:messages`
+Holds user `$uid`'s specific message queue.
 
-### `rm:users:$cid:key`
-Holds user `$cid`'s specific authentication token.
+### `rm:users:$uid:key`
+Holds user `$uid`'s specific authentication token.
 
 ### `rm:channels:$cid:subscribers`
 Holds a list of members to deliver a message to `rm:channels:$cid` to.
