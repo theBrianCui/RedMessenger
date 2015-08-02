@@ -2,7 +2,7 @@
 
 #### If a Redis instance `PUBLISH`es to a channel with no `SUBSCRIBE`rs, does it make a sound?
 
-#### RedMessenger
+#### Redis
 ```
 PUBLISH rm.users.user1 "Hello, world!"
 (integer) 0
