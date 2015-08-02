@@ -7,7 +7,7 @@ var SocketIO = require('socket.io')(Http);
 var SocketIOConnection = 'connection';
 
 // TODO: Refactor into a config.json
-var REDIS_HOST = "nm-hackathon";
+var REDIS_HOST = "localhost";
 var WS_PORT = 8080;
 var REDIS_PORT = 6379;
 var SECURE_MODE = true;

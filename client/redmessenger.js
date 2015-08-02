@@ -4,9 +4,32 @@ function RedMessenger(url, userID, userKey) {
     this.url = url;
     this.userID = userID;
     this.userKey = userKey || '';
+    var notifList = setup();
 
     this.onMessage =  function(msg) {
-        console.log('RedMessage! ' + msg);
+    	var test = "Wassup yo"
+        var notification = document.createElement("div");
+        notification.className = 'notification';
+
+        var icon = document.createElement("div");
+        icon.className = 'icon';
+
+        var title = document.createElement("div");
+        title.className = 'title';
+        title.innerHTML = 'Title';
+
+
+        notifList.appendChild(notification);
+        notification.appendChild(icon);
+        notification.appendChild(title);
+    };
+
+    function setup() {
+    	var div = document.createElement("div");
+    	div.className = 'notif-space';
+
+    	document.body.appendChild(div);
+    	return div;
     };
 
     var socket;
@@ -29,4 +52,4 @@ function RedMessenger(url, userID, userKey) {
     }
 }
 
-var rm = new RedMessenger('http://localhost:8080/rm', 'seanc', '1234');
+var rm = new RedMessenger('http://localhost:8080/rm', 'kevina', '1234');
