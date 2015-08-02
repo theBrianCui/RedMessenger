@@ -120,7 +120,7 @@ function assignClientSocket(socket, uid) {
         var targetSocket = Clients[uid][ConnCounter[uid]];
 
         //Forcibly disconnect the old socket
-        if(targetSocket.connected)
+        if(targetSocket && targetSocket.connected)
             targetSocket.disconnect();
 
         Clients[uid][ConnCounter[uid]] = socket;
@@ -154,7 +154,7 @@ function passMessage(uid, message) {
     //  If the client is connected, send the message and mark that there was a connection
     //  If no client in the array of connections is connected, do nothing.
     for(var socket in socketCollection){
-        if(!(socketCollection[socket] == null || !socket.connected)){
+        if(!(socketCollection[socket] == null || !socketCollection[socket].connected)){
             anyConn = true;
             console.log("Sending message " + message + " to " + uid + " on socket " + socketCollection[socket].id);
             socketCollection[socket].emit('message', message);
