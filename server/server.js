@@ -12,6 +12,7 @@ var WS_PORT = Config.ws_port;
 var REDIS_PORT = Config.redis_port;
 var SECURE_MODE = Config.secure_mode;
 var RM_ROUTE = Config.rm_route;
+var EXPIRY_TIME = Config.queue_expiry;
 
 //Name and Namespace constants
 //Redis Key Naming
@@ -164,7 +165,15 @@ function distributeMessage(cid, message) {
 }
 
 function enqueueMessage(uid, message) {
-    redisClient.rpush(getQueueName(uid), message);
+    var queueName = getQueueName(uid);
+
+    redisClient.pipeline()
+      .rpush(queueName, message)
+      .expire(queueName, EXPIRY_TIME)
+      .exec(function(error, result) {
+          if (error)
+            console.log("Error queueing message: " + error);
+      });
 }
 
 function dequeueMessage(uid, message) {
