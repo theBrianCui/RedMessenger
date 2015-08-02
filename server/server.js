@@ -141,8 +141,8 @@ function passMessage(uid, message) {
 
 function enqueueMessage(uid, message) {
     var queueName = getQueueName(uid);
-    
-    redisClient
+
+    redisClient.pipeline()
       .rpush(queueName, message)
       .expire(queueName, EXPIRY_TIME)
       .exec();
