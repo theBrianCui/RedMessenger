@@ -4,18 +4,24 @@ var Http = require('http').Server(Express);
 var SocketIO = require('socket.io')(Http);
 var Cluster = require('cluster');
 
-var numCPUs = require('os').cpus().length;
-console.log("This computer has " + numCPUs + " CPUs.");
+var Config = require('./config.json');
 
-if(Cluster.isMaster) {
-    console.log("I'm a master!");
-    for (var i = 0; i < numCPUs; i++)
-        Cluster.fork();
-} else {
-    console.log("I'm a worker!");
+if(Config.cluster.enabled) {
+    if (Cluster.isMaster) {
+        console.log("I'm a master!");
+
+        var numCPUs = require('os').cpus().length;
+        if(Config.cluster.max_threads > 0 && numCPUs > Config.cluster.max_threads)
+            numCPUs = Config.cluster.max_threads;
+
+        console.log("This computer has " + numCPUs + " CPUs.");
+        for (var i = 0; i < numCPUs - 1; i++)
+            Cluster.fork();
+    } else {
+        console.log("I'm a worker!");
+    }
 }
 
-var Config = require('./config.json');
 
 // Constants
 
