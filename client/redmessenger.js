@@ -47,22 +47,22 @@ function RedMessenger(url, userID, userKey) {
 
     var socket;
     if(io) {
-        var socket = io(this.url);
+        socket = io(this.url);
         socket.on('connect', function () {
             console.log('RedMessenger Connected!');
-            console.log('Sending identifier ' + userID);
 
-            socket.emit('identifier', this.userID +
-                (this.userKey ? ':' + this.userKey : '')
-            );
+            var identifier = this.userID + (this.userKey ? ':' + this.userKey : '');
+            console.log('Sending identifier ' + identifier);
 
-            socket.on('message', function (msg) {
-                this.onMessage(msg);
-            }.bind(this))
+            socket.emit('identifier', identifier);
         }.bind(this));
+
+        socket.on('message', function (msg) {
+            this.onMessage(msg);
+        }.bind(this))
     } else {
         console.log('Socket.IO is not embedded in this page. RedMessenger will not be able to serve messages.')
     }
 }
 
-var rm = new RedMessenger('http://localhost:8080/rm', 'kevina', '1234');
+var rm = new RedMessenger('http://localhost:8080/rm', 'brianc', '1234');
