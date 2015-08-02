@@ -1,0 +1,7 @@
+{
+  "redis_host": "nm-hackathon",
+  "redis_port": 6379,
+  "ws_port": 8080,
+  "secure_mode": true,
+  "rm_route": "/rm"
+}
