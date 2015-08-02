@@ -76,8 +76,8 @@ We gotcha covered!
 #### Redis
 ```
 "RPUSH" "rm:users:user1:messages" "Hello, world!"
-"RPUSH" "rm:groups:cats:messages" "Meow!"
-"LRANGE" "rm:groups:cats:members" "0" "-1"
+"RPUSH" "rm:channels:cats:messages" "Meow!"
+"LRANGE" "rm:channels:cats:members" "0" "-1"
 "RPUSH" "rm:users:user1:messages" "Meow!"
 "RPUSH" "rm:users:user2:messages" "Meow!"
 ```
@@ -86,7 +86,7 @@ We gotcha covered!
 ```
 New message from channel rm.users.user1
 Client is not online, queueing message in Redis (rm:users:user1:messages)
-New message from channel rm.groups.cats
+New message from channel rm.channels.cats
 Client is not online, queueing message in Redis (rm:users:user1:messages)
 Client is not online, queueing message in Redis (rm:users:user2:messages)
 user5: Sending message 'Meow!' from rm.cats
@@ -107,26 +107,26 @@ user1: Purging message 'Meow!' from rm.cats
 
 ## API
 ### `subscribe(uid[, auth_key])`
-Subscribes to `rm.users.$uid` and any group in `rm.groups.$gid` that `uid` is subscribed to (has an entry in `rm:groups:$gid:members`). Recieves all queued messages from `rm:users:$uid:messages` immediately.
+Subscribes to `rm.users.$uid` and any group in `rm.channels.$cid` that `uid` is subscribed to (has an entry in `rm:channels:$cid:subscribers`). Recieves all queued messages from `rm:users:$uid:messages` immediately.
 
 ## Value namespaces
 
-### `rm:users:$uid:messages`
-Holds user `$uid`'s specific message queue.
+### `rm:users:$cid:messages`
+Holds user `$cid`'s specific message queue.
 
-### `rm:users:$uid:key`
-Holds user `$uid`'s specific authentication token.
+### `rm:users:$cid:key`
+Holds user `$cid`'s specific authentication token.
 
-### `rm:groups:$gid:members`
-Holds a list of members to deliver a message to `rm:groups:$gid` to.
+### `rm:channels:$cid:subscribers`
+Holds a list of members to deliver a message to `rm:channels:$cid` to.
 
 ## Channel namespaces
 
 ### `rm.users.$uid`
 `PUBLISH`ing to this channel will deliver a message to `$uid` directly.
 
-### `rm.groups.$gid`
-`PUBLISH`ing to this channel will deliver a message to all `$uid`s subscribed to `$gid`.
+### `rm.channels.$cid`
+`PUBLISH`ing to this channel will deliver a message to all `$uid`s subscribed to `$cid`.
 
 ## Example direct message flow
 ### Send a message to **`user1`!**
@@ -137,8 +137,8 @@ Holds a list of members to deliver a message to `rm:groups:$gid` to.
 
 ## Example group message flow
 ### Send a message to **`cats`!**
-* **Redis** Deliver the message to the **`rm.groups.cats`** channel.
-* **RedMessenger** For every `$user` in **`rm:groups:cats:members`** ...
+* **Redis** Deliver the message to the **`rm.channels.cats`** channel.
+* **RedMessenger** For every `$user` in **`rm:channels:cats:subscribers`** ...
 * **RedMessenger** If `$user` is online, deliver the message to `$user` over their `WebSocket`!
 * **RedMessenger** If `$user` isn't online, store the message in `rm:users:$user:messages`.
-* **RedMessenger** When `$user` is active on our `WebSocket`, send `$user` all messages from `rm:users:$user:messages`, including the one delivered to **`rm.groups.cats`** over their `WebSocket`.
+* **RedMessenger** When `$user` is active on our `WebSocket`, send `$user` all messages from `rm:users:$user:messages`, including the one delivered to **`rm.channels.cats`** over their `WebSocket`.
