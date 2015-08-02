@@ -208,9 +208,13 @@ function init() {
 
         } else if (msgType === 'channel') {
 
-            var cid = channel.substring((RM_GLOBAL_PREFIX + RM_CHANNELS_PREFIX).length);
+            var cid = getCID(channel);
             console.log("Channel ID for this message is " + cid);
             distributeMessage(cid, message)
+
+        } else if (msgType === 'update') {
+            for(var uid in Clients)
+                purgeMessageQueue(uid);
         }
     }
 
@@ -236,6 +240,27 @@ function init() {
                         }
                     });
             }
+        } else if (msgType === 'channel') {
+            var cid = getCID(channel);
+            var hash = generateMessageHash(channel, message);
+            redisClient.hincrby(REDIS_GLOBAL_PREFIX + 'messages', hash, 1, function(err, result) {
+                console.log("Result: " + JSON.stringify(result));
+                if (parseInt(result) === 1) {
+                    console.log("Worker " + parseInt(result) + " won the channel message race.");
+                    distributeMessage(cid, generateMetadata(channel, message));
+                    setTimeout(function () {
+                        redisClient.publish(RM_GLOBAL_PREFIX + 'update', 'update');
+                    }, 1200)
+
+                } else if (parseInt(result) >= numThreads) {
+                    redisClient.hdel(REDIS_GLOBAL_PREFIX + 'messages', hash, function (err, result) {
+                        if (err) console.log("Redis query failure: " + err);
+                    })
+                }
+            })
+        } else if (msgType === 'update') {
+            for(var uid in Clients)
+                purgeMessageQueue(uid);
         }
     }
 
@@ -287,17 +312,11 @@ function init() {
         if (!anyConn) {
             console.log("Client is not online, queueing message in Redis list " + getQueueName(uid));
             enqueueMessage(uid, message);
-
-            //Print existing messages
-            /*redisClient.lrange(getQueueName(uid), 0, -1, function (error, result) {
-             console.log("DEBUG: redis server returned " + result);
-             console.log(JSON.stringify(result));
-             });*/
         }
     }
 
 //"Distribute" a message on a given CID. This means passing the message to each user on the channel.
-    function distributeMessage(cid, message) {
+    function distributeMessage(cid, message, callback) {
         console.log("Getting SMEMBERS for " + REDIS_GLOBAL_PREFIX + REDIS_CHANNELS_PREFIX + cid + ":subscribers");
         redisClient.smembers(REDIS_GLOBAL_PREFIX + REDIS_CHANNELS_PREFIX + cid + ":subscribers",
             function (err, result) {
@@ -358,12 +377,18 @@ function init() {
             return 'user';
         } else if (channel.indexOf(RM_GLOBAL_PREFIX + RM_CHANNELS_PREFIX) === 0) {
             return 'channel';
+        } else if (RM_GLOBAL_PREFIX + 'update') {
+            return 'update';
         }
         return null;
     }
 
     function getUID(channel) {
         return channel.substring((RM_GLOBAL_PREFIX + RM_USERS_PREFIX).length);
+    }
+
+    function getCID(channel) {
+        return channel.substring((RM_GLOBAL_PREFIX + RM_CHANNELS_PREFIX).length);
     }
 
     function getChannelName(uid) {
