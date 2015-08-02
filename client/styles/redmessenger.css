@@ -1,0 +1,53 @@
+.notif-space {
+   height: 50%;
+   width: 300px;
+   position: fixed;
+   float: right;
+   opacity: .7;
+   right: 0;
+   margin-top: 3px;
+   visibility: hidden;
+   z-index: 10000;
+}
+
+.notification {
+	height: 80px;
+   width: 285px;
+	background-color: #FAA612;
+	border-radius: 10px;
+	margin-bottom: 10px;
+   visibility: visible;
+   transition: opacity .25s ease-in-out;
+   -moz-transition: opacity .25s ease-in-out;
+   -webkit-transition: opacity .25s ease-in-out;
+}
+
+.notification-fade {
+   opacity: 0;
+}
+
+.icon {
+   background-image: url(SpiceworksLogo.png);
+   background-repeat: no-repeat;
+   height: 45px;
+   width: 45px;
+   background-position: -12px -12px;
+   display: inline-block;
+   float: left;
+}
+
+.title {
+   font-family: sans-serif;
+   display: inline-block;
+   padding-top: 16px;
+   font-weight: bold;
+   font-size: 20px;
+}
+
+.short-body {
+   font-size: 12px;
+   font-family: Arial;
+   color: white;
+   padding-top: 6px;
+   text-indent: 9px;
+}
