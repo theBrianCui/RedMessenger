@@ -105,6 +105,31 @@ user1: Purging message 'Meow!' from rm.cats
 "DEL" "rm:users:user1:messages"
 ```
 
+## Message format
+Every message contains some metadata and a message payload.
+```javascript
+{
+  source: 'rm.users.user1',
+  timestamp: 1438480701712,
+  bubble: true,
+  payload: '...'
+}
+```
+
+### `source`
+What channel the message originated from. For a one-to-one message, this will be `rm.users.$uid`; for a one-to-many message, this will be `rm.groups.$cid`.
+
+### `timestamp`
+The time this message was originally `PUBLISH`ed, in Unix time.
+
+### `bubble`
+Directive that this message should be displayed on the desktop, if the browser supports desktop notifications. Set to `true` on the first `WebSocket` established for this user, and `false` on further concurrent `WebSockets` opened.
+
+This is to prevent multiple tabs identifying as the same user from spawning one desktop notification _each_ on a single message.
+
+### `payload`
+The message payload that was `PUBLISH`ed. This can be whatever you want! (JSON, plaintext, a hash value...)
+
 ## API
 ### `subscribe(uid[, auth_key])`
 Subscribes to `rm.users.$uid` and any group in `rm.channels.$cid` that `uid` is subscribed to (has an entry in `rm:channels:$cid:subscribers`). Recieves all queued messages from `rm:users:$uid:messages` immediately. 
