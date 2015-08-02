@@ -9,6 +9,8 @@ function RedMessenger(url, userID, userKey) {
     var i = 0;
 
     this.onMessage =  function(msg) {
+        console.log("RedMessage received: " + JSON.stringify(msg));
+
         var notification = document.createElement("div");
         notification.className = 'notification';
 
@@ -65,4 +67,4 @@ function RedMessenger(url, userID, userKey) {
     }
 }
 
-var rm = new RedMessenger('http://localhost:8080/rm', 'seanc', '1234');
+var rm = new RedMessenger('http://localhost:8080/rm', 'brianc', '1234');

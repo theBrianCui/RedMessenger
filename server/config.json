@@ -1,5 +1,5 @@
 {
-  "redis_host": "nm-hackathon",
+  "redis_host": "localhost",
   "redis_port": 6379,
   "ws_port": 8080,
   "secure_mode": true,
@@ -8,6 +8,6 @@
   "conn_limit": 6,
   "cluster": {
     "enabled": true,
-    "max_threads": 2
+    "max_threads": 4
   }
 }
