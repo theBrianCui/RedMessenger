@@ -116,43 +116,43 @@ Every message contains some metadata and a message payload.
 }
 ```
 
-### `source`
+#### `source`
 What channel the message originated from. For a one-to-one message, this will be `rm.users.$uid`; for a one-to-many message, this will be `rm.groups.$cid`.
 
-### `timestamp`
+#### `timestamp`
 The time this message was originally `PUBLISH`ed, in Unix time.
 
-### `bubble`
+#### `bubble`
 Directive that this message should be displayed on the desktop, if the browser supports desktop notifications. Set to `true` on the first `WebSocket` established for this user, and `false` on further concurrent `WebSockets` opened.
 
 This is to prevent multiple tabs identifying as the same user from spawning one desktop notification _each_ on a single message.
 
-### `payload`
+#### `payload`
 The message payload that was `PUBLISH`ed. This can be whatever you want! (JSON, plaintext, a hash value...)
 
 ## API
-### `subscribe(uid[, auth_key])`
+#### `subscribe(uid[, auth_key])`
 Subscribes to `rm.users.$uid` and any group in `rm.channels.$cid` that `uid` is subscribed to (has an entry in `rm:channels:$cid:subscribers`). Recieves all queued messages from `rm:users:$uid:messages` immediately. 
 
 If an `auth_key` is provided, attempts to match it against the value in `rm:users:$uid:key` - if it doesn't match, does nothing.
 
 ## Value namespaces
 
-### `rm:users:$uid:messages`
+#### `rm:users:$uid:messages`
 Holds user `$uid`'s specific message queue.
 
-### `rm:users:$uid:key`
+#### `rm:users:$uid:key`
 Holds user `$uid`'s specific authentication token.
 
-### `rm:channels:$cid:subscribers`
+#### `rm:channels:$cid:subscribers`
 Holds a list of members to deliver a message to `rm:channels:$cid` to.
 
 ## Channel namespaces
 
-### `rm.users.$uid`
+#### `rm.users.$uid`
 `PUBLISH`ing to this channel will deliver a message to `$uid` directly.
 
-### `rm.channels.$cid`
+#### `rm.channels.$cid`
 `PUBLISH`ing to this channel will deliver a message to all `$uid`s subscribed to `$cid`.
 
 ## Example direct message flow
