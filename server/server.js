@@ -141,17 +141,21 @@ function onNewServerMessage(channel, message) {
 
         var cid = channel.substring((RM_GLOBAL_PREFIX + RM_CHANNELS_PREFIX).length);
         console.log("Channel ID for this message is " + cid);
+        message = generateMetadata(channel, message);
         distributeMessage(cid, message)
 
     }
 }
 
 function generateMetadata(channel, message) {
+    console.log("DEBUG_METADATA_1, " + message);
+    console.log("DEBUG_METADATA_2, " + encodeURI(message));
+
     return {
         'source': channel,
         'timestamp': Date.now(),
         'bubble': false,
-        'payload': message
+        'payload': encodeURI(message)
     };
 }
 
@@ -172,6 +176,7 @@ function passMessage(uid, message) {
 
         if(!(socketCollection[socket] == null || !socketCollection[socket].connected)){
             anyConn = true;
+            message.payload = decodeURI(message.payload);
             console.log("Sending message " + message.payload + " to " + uid + " on socket " + socketCollection[socket].id);
             socketCollection[socket].emit('message', message);
             sendCount++;
@@ -231,7 +236,7 @@ function purgeMessageQueue(uid) {
             console.log(queue + " has " + messages.length + " messages enqueued, purging!");
             messages.forEach(function (message) {
                 console.log("Dequeuing message for " + uid + ": " + message);
-                passMessage(uid, JSON.parse(message));
+                passMessage(uid, message);
             });
         } else {
             console.log(queue + " has 0 messages enqueued.");
