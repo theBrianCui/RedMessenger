@@ -4,5 +4,6 @@
   "ws_port": 8080,
   "secure_mode": true,
   "rm_route": "/rm",
-  "queue_expiry": 604800
+  "queue_expiry": 604800,
+  "conn_limit": 6
 }
