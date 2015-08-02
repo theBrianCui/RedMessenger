@@ -12,18 +12,23 @@ var WS_PORT = Config.ws_port;
 var REDIS_PORT = Config.redis_port;
 var SECURE_MODE = Config.secure_mode;
 var RM_ROUTE = Config.rm_route;
+var CONN_LIMIT = (Config.conn_limit > 99 || Config.conn_limit < 1) ? 99 : Config.conn_limit;
+var EXPIRY_TIME = Config.queue_expiry;
 
 //Name and Namespace constants
 //Redis Key Naming
-var REDIS_KEY_PREFIX = 'rm:';
+var REDIS_GLOBAL_PREFIX = 'rm:';
 var REDIS_USERS_PREFIX = 'users:';
+var REDIS_CHANNELS_PREFIX = 'channels:';
 
 //Redis PubSub Channel Naming
-var RM_CHANNEL_PREFIX = 'rm.';
+var RM_GLOBAL_PREFIX = 'rm.';
 var RM_USERS_PREFIX = 'users.';
+var RM_CHANNELS_PREFIX = 'channels.';
 
 var Server = SocketIO.of(RM_ROUTE);
 var Clients = {};
+var ConnCounter = {};
 
 // SocketIO listen
 Http.listen(WS_PORT, onListenDebug);
@@ -43,7 +48,7 @@ var redisClient = new Redis({
     port: REDIS_PORT
 });
 
-redisSubscriber.psubscribe(RM_CHANNEL_PREFIX + '*', function (error, count) {
+redisSubscriber.psubscribe(RM_GLOBAL_PREFIX + '*', function (error, count) {
     console.log("We're now subscribed to " + count + " channels on Redis.");
 });
 redisSubscriber.on('pmessage', function(pattern, channel, message) {
@@ -83,9 +88,9 @@ function onIdentityRecv(socket, id, callback) {
     } else if(key) {
 
         console.log("Verifying user key...");
-        console.log("Performing GET " + REDIS_KEY_PREFIX + REDIS_USERS_PREFIX + uid + ':key');
+        console.log("Performing GET " + REDIS_GLOBAL_PREFIX + REDIS_USERS_PREFIX + uid + ':key');
 
-        redisClient.get(REDIS_KEY_PREFIX + REDIS_USERS_PREFIX + uid + ':key',
+        redisClient.get(REDIS_GLOBAL_PREFIX + REDIS_USERS_PREFIX + uid + ':key',
             function(err, result) {
                 console.log("Redis response: " + err + ", " + result);
                 if(!err && result === key) {
@@ -105,18 +110,39 @@ function onIdentityRecv(socket, id, callback) {
 
 function assignClientSocket(socket, uid) {
     console.log("Assigning id " + uid + " to socket " + socket.id);
-    Clients[uid] = socket;
+    //If the attribute uid of object Clients does not excist, create it (an array)
+    //Otherwise, it exists and we are going to push to it
+    if(!Clients[uid]) {
+        Clients[uid] = [socket];
+        ConnCounter[uid] = 1;
+    }else {
+        ConnCounter[uid] = ConnCounter[uid] % CONN_LIMIT;
+        var targetSocket = Clients[uid][ConnCounter[uid]];
+
+        //Forcibly disconnect the old socket
+        if(targetSocket && targetSocket.connected)
+            targetSocket.disconnect();
+
+        Clients[uid][ConnCounter[uid]] = socket;
+        ConnCounter[uid]++;
+    }
 }
 
 function onNewServerMessage(channel, message) {
     console.log("New message from channel " + channel);
-    if(channel.indexOf(RM_CHANNEL_PREFIX + RM_USERS_PREFIX) === 0) {
-        uid = channel.substring((RM_CHANNEL_PREFIX + RM_USERS_PREFIX).length);
+    if(channel.indexOf(RM_GLOBAL_PREFIX + RM_USERS_PREFIX) === 0) {
+
+        var uid = channel.substring((RM_GLOBAL_PREFIX + RM_USERS_PREFIX).length);
         console.log("User ID for this message is " + uid);
         message = jsonify(channel, message);
         passMessage(uid, message);
-    } else {
-        console.log("Channel was not user-targeted.");
+
+    } else if (channel.indexOf(RM_GLOBAL_PREFIX + RM_CHANNELS_PREFIX) === 0) {
+
+        var cid = channel.substring((RM_GLOBAL_PREFIX + RM_CHANNELS_PREFIX).length);
+        console.log("Channel ID for this message is " + cid);
+        distributeMessage(cid, message)
+
     }
 }
 
@@ -130,30 +156,60 @@ function jsonify(channel, message) {
 
 //"Pass" a message to a UID. This means sending it if they're online, and queueing it if they're not.
 function passMessage(uid, message) {
-    var socket = Clients[uid];
-    if (socket == null || !socket.connected) {
+    var socketCollection = Clients[uid];
+    var anyConn = false;
+
+    //Iterate over the connections of the client.
+    //  If the client is connected, send the message and mark that there was a connection
+    //  If no client in the array of connections is connected, do nothing.
+    for(var socket in socketCollection){
+        if(!(socketCollection[socket] == null || !socketCollection[socket].connected)){
+            anyConn = true;
+            console.log("Sending message " + message + " to " + uid + " on socket " + socketCollection[socket].id);
+            socketCollection[socket].emit('message', message);
+        }
+    }
+
+    //If no connection was stablished, we requeue the message to Redis
+    if(!anyConn){
         console.log("Client is not online, queueing message in Redis list " + getQueueName(uid));
         enqueueMessage(uid, message);
 
         //Print existing messages
         /*redisClient.lrange(getQueueName(uid), 0, -1, function (error, result) {
-            console.log("DEBUG: redis server returned " + result);
-            console.log(JSON.stringify(result));
-        });*/
-
-    } else {
-        console.log("Sending message " + message + " to " + uid + " on socket " + socket.id);
-        socket.emit('message', message);
+         console.log("DEBUG: redis server returned " + result);
+         console.log(JSON.stringify(result));
+         });*/
     }
 }
 
-function enqueueMessage(uid, message) {
-    redisClient.rpush(getQueueName(uid), message);
+//"Distribute" a message on a given CID. This means passing the message to each user on the channel.
+function distributeMessage(cid, message) {
+    console.log("Getting SMEMBERS for " + REDIS_GLOBAL_PREFIX + REDIS_CHANNELS_PREFIX + cid + ":subscribers");
+    redisClient.smembers(REDIS_GLOBAL_PREFIX + REDIS_CHANNELS_PREFIX + cid + ":subscribers",
+        function(err, result) {
+            if(!err && result.length !== 0) {
+                console.log("There are " + result.length + " recipients for channel " + cid);
+                result.forEach(function(uid) {
+                    passMessage(uid, message);
+                });
+            } else if (err) {
+                console.log("Redis connection error: " + err);
+            }
+        }
+    );
 }
 
-function dequeueMessage(uid, message) {
-    console.log("Dequeuing message for " + uid + ": " + message);
-    passMessage(uid, message);
+function enqueueMessage(uid, message) {
+    var queueName = getQueueName(uid);
+
+    redisClient.pipeline()
+      .rpush(queueName, message)
+      .expire(queueName, EXPIRY_TIME)
+      .exec(function(error, result) {
+          if (error)
+            console.log("Error queueing message: " + error);
+      });
 }
 
 function purgeMessageQueue(uid) {
@@ -166,7 +222,8 @@ function purgeMessageQueue(uid) {
 
             console.log(queue + " has " + messages.length + " messages enqueued, purging!");
             messages.forEach(function (message) {
-                dequeueMessage(uid, message);
+                console.log("Dequeuing message for " + uid + ": " + message);
+                passMessage(uid, message);
             });
         } else {
             console.log(queue + " has 0 messages enqueued.");
@@ -175,9 +232,9 @@ function purgeMessageQueue(uid) {
 }
 
 function getChannelName(uid) {
-    return RM_CHANNEL_PREFIX + RM_USERS_PREFIX + uid;
+    return RM_GLOBAL_PREFIX + RM_USERS_PREFIX + uid;
 }
 
 function getQueueName(uid) {
-    return REDIS_KEY_PREFIX + REDIS_USERS_PREFIX + uid + ':messages';
+    return REDIS_GLOBAL_PREFIX + REDIS_USERS_PREFIX + uid + ':messages';
 }
