@@ -113,10 +113,19 @@ function onNewServerMessage(channel, message) {
     if(channel.indexOf(RM_CHANNEL_PREFIX + RM_USERS_PREFIX) === 0) {
         uid = channel.substring((RM_CHANNEL_PREFIX + RM_USERS_PREFIX).length);
         console.log("User ID for this message is " + uid);
+        message = jsonify(channel, message);
         passMessage(uid, message);
     } else {
         console.log("Channel was not user-targeted.");
     }
+}
+
+function jsonify(channel, message) {
+    return {
+        'source': channel,
+        'timestamp': Date.now(),
+        'payload': message
+    };
 }
 
 //"Pass" a message to a UID. This means sending it if they're online, and queueing it if they're not.
