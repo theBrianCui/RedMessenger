@@ -2,6 +2,19 @@ var Redis = require('ioredis');
 var Express = require('express')();
 var Http = require('http').Server(Express);
 var SocketIO = require('socket.io')(Http);
+var Cluster = require('cluster');
+
+var numCPUs = require('os').cpus().length;
+console.log("This computer has " + numCPUs + " CPUs.");
+
+if(Cluster.isMaster) {
+    console.log("I'm a master!");
+    for (var i = 0; i < numCPUs; i++)
+        Cluster.fork();
+} else {
+    console.log("I'm a worker!");
+}
+
 var Config = require('./config.json');
 
 // Constants
