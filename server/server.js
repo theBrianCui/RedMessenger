@@ -134,7 +134,7 @@ function onNewServerMessage(channel, message) {
 
         var uid = channel.substring((RM_GLOBAL_PREFIX + RM_USERS_PREFIX).length);
         console.log("User ID for this message is " + uid);
-        message = jsonify(channel, message);
+        message = generateMetadata(channel, message);
         passMessage(uid, message);
 
     } else if (channel.indexOf(RM_GLOBAL_PREFIX + RM_CHANNELS_PREFIX) === 0) {
@@ -146,7 +146,7 @@ function onNewServerMessage(channel, message) {
     }
 }
 
-function jsonify(channel, message) {
+function generateMetadata(channel, message) {
     return {
         'source': channel,
         'timestamp': Date.now(),
@@ -163,15 +163,18 @@ function passMessage(uid, message) {
     //Iterate over the connections of the client.
     //  If the client is connected, send the message and mark that there was a connection
     //  If no client in the array of connections is connected, do nothing.
-    var count = 0;
+    var sendCount = 0;
     for(var socket in socketCollection){
-        if (count == 0)
-          message.bubble = true;
+        if (sendCount === 0) //Only the first sent message will have bubble = true
+            message.bubble = true;
+        else
+            message.bubble = false;
+
         if(!(socketCollection[socket] == null || !socketCollection[socket].connected)){
             anyConn = true;
             console.log("Sending message " + message.payload + " to " + uid + " on socket " + socketCollection[socket].id);
             socketCollection[socket].emit('message', message);
-            count++;
+            sendCount++;
         }
     }
 
