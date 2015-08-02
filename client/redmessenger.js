@@ -18,10 +18,14 @@ function RedMessenger(url, userID, userKey) {
         title.className = 'title';
         title.innerHTML = 'Title';
 
+        var shortBody = document.createElement("div");
+        shortBody.className = 'short-body';
+        shortBody.innerHTML = 'Message appears here...'
 
         notifList.appendChild(notification);
         notification.appendChild(icon);
         notification.appendChild(title);
+        notification.appendChild(shortBody);
     };
 
     function setup() {
