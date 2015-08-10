@@ -1,53 +1,57 @@
+body {
+    margin: 0;
+}
+;
 .notif-space {
-   height: 50%;
-   width: 300px;
-   position: fixed;
-   float: right;
-   opacity: .7;
-   right: 0;
-   margin-top: 3px;
-   visibility: hidden;
-   z-index: 99999999;
+    height: 50%;
+    width: 300px;
+    position: fixed;
+    float: right;
+    opacity: .7;
+    right: 0;
+    margin-top: 3px;
+    visibility: hidden;
+    z-index: 99999999;
 }
-
 .notification {
-	height: 80px;
-   width: 285px;
-	background-color: #FAA612;
-	border-radius: 10px;
-	margin-bottom: 10px;
-   visibility: visible;
-   transition: opacity .25s ease-in-out;
-   -moz-transition: opacity .25s ease-in-out;
-   -webkit-transition: opacity .25s ease-in-out;
+    height: 80px;
+    width: 285px;
+    background-color: #FAA612;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    visibility: visible;
+    transition: opacity .25s ease-in-out;
+    -moz-transition: opacity .25s ease-in-out;
+    -webkit-transition: opacity .25s ease-in-out;
+    position: fixed;
+    top: 24px;
+    right: 10px;
+    opacity: .9;
+    cursor: hand;
+    padding-right: 8px;
 }
-
 .notification-fade {
-   opacity: 0;
+    opacity: 0;
 }
-
 .icon {
-   background-image: url(SpiceworksLogo.png);
-   background-repeat: no-repeat;
-   height: 45px;
-   width: 45px;
-   background-position: -12px -12px;
-   display: inline-block;
-   float: left;
+    background-image: url(SpiceworksLogo.png);
+    background-repeat: no-repeat;
+    height: 80px;
+    width: 45px;
+    background-position: -12px -12px;
+    display: inline-block;
+    float: left;
 }
-
 .title {
-   font-family: sans-serif;
-   display: inline-block;
-   padding-top: 16px;
-   font-weight: bold;
-   font-size: 20px;
+    font-family: sans-serif;
+    display: inline-block;
+    padding-top: 16px;
+    font-weight: bold;
+    font-size: 16px;
 }
-
 .short-body {
-   font-size: 12px;
-   font-family: Arial;
-   color: white;
-   padding-top: 6px;
-   text-indent: 9px;
+    font-size: 13px;
+    font-family: Arial;
+    color: white;
+    padding-top: 6px;
 }
